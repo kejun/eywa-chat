@@ -1,0 +1,44 @@
+{
+  "name": "eywa-chat",
+  "version": "1.0.0",
+  "description": "Persistent-memory chatbot with Next.js, SeekDB, and LangGraph",
+  "private": true,
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "predev": "node scripts/validate-env.mjs",
+    "dev": "next dev",
+    "prebuild": "node scripts/validate-env.mjs",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kejun/eywa-chat.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kejun/eywa-chat/issues"
+  },
+  "homepage": "https://github.com/kejun/eywa-chat#readme",
+  "dependencies": {
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^10.0.0",
+    "eslint-config-next": "^16.1.6",
+    "typescript": "^5.9.3"
+  }
+}
