@@ -45,7 +45,7 @@
 | #23 | [E1] 配置 Preview/Production 环境变量与密钥管理 | Done (Doc/Code) | `README.md`, `docs/DEPLOYMENT_RUNBOOK.md`, env schema |
 | #24 | [E2] 增加指标采集与 traceId 全链路关联 | Done | `lib/observability/*`, `/api/metrics`, traceId middleware |
 | #25 | [E3] 实现 Vercel Cron：摘要压缩 + TTL 清理 | Done (Phase-1) | `/api/cron/memory-ttl`, `/api/cron/memory-compact` |
-| #26 | [E4] 编写上线与回滚手册，完成压测报告 | Partially done | runbook+模板+loadtest scripts 已完成；真实环境压测结果待补 |
+| #26 | [E4] 编写上线与回滚手册，完成压测报告 | Partially done | runbook+模板+loadtest scripts 已完成；请按 `docs/LOADTEST_EXECUTION_CHECKLIST.md` 执行并贴结果 |
 
 ---
 
