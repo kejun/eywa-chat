@@ -12,7 +12,7 @@
     "prebuild": "node scripts/validate-env.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck"
   },
