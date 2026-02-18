@@ -39,6 +39,20 @@
    - Cron 路由启用 `CRON_SECRET`
    - 无测试密钥泄露到前端
 
+## 2.1 本地/预发 JWT 生成
+
+可以使用内置脚本生成压测 token：
+
+```bash
+npm run auth:jwt:generate -- \
+  --tenant-id "t-loadtest" \
+  --user-id "u-loadtest" \
+  --expires-in-seconds 3600 \
+  --show-payload 1
+```
+
+若未通过 `--secret` 传入，会默认读取环境变量 `AUTH_JWT_SECRET`。
+
 ## 3. Vercel Cron 配置建议
 
 建议创建两条 Cron：
@@ -73,7 +87,7 @@ npm run loadtest:chat:report -- \
   --url "https://<preview-domain>/api/chat" \
   --requests 100 \
   --concurrency 10 \
-  --jwt-token "<loadtest-jwt-token>" \
+  --jwt-token "$(npm run -s auth:jwt:generate -- --tenant-id t-loadtest --user-id u-loadtest)" \
   --summary-out "./artifacts/loadtest-summary.json" \
   --report-out "./artifacts/loadtest-report.md"
 ```

@@ -25,6 +25,12 @@
 ## 3. 执行命令
 
 ```bash
+# 先生成 JWT（可选）
+npm run auth:jwt:generate -- \
+  --tenant-id "t-loadtest" \
+  --user-id "u-loadtest"
+
+# 执行压测
 npm run loadtest:chat -- \
   --url "<chat-endpoint>" \
   --requests 100 \
