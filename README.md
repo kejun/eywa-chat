@@ -470,6 +470,7 @@ Vercel 发布、Cron、观测与回滚说明见：
 
 - `docs/DEPLOYMENT_RUNBOOK.md`
 - `docs/PERF_REPORT_TEMPLATE.md`
+- `docs/ISSUE_PROGRESS.md`
 
 常用辅助命令：
 
