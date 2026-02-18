@@ -1,10 +1,11 @@
 import { env } from "@/lib/env";
+import { resolveJwtIdentityFromHeaders } from "@/lib/auth/jwt";
 
 export type RequestIdentity = {
   tenantId: string;
   userId: string;
   traceId: string;
-  source: "headers" | "query";
+  source: "jwt" | "headers";
 };
 
 export type RequestIdentityResult =
@@ -19,49 +20,38 @@ export type RequestIdentityResult =
       error: string;
     };
 
-type ResolveIdentityOptions = {
-  allowQueryFallback?: boolean;
-};
-
 function readTraceId(request: Request): string {
   return request.headers.get("x-trace-id") ?? crypto.randomUUID();
 }
 
-export function resolveRequestIdentity(
-  request: Request,
-  options: ResolveIdentityOptions = {},
-): RequestIdentityResult {
+export async function resolveRequestIdentity(request: Request): Promise<RequestIdentityResult> {
   const traceId = readTraceId(request);
-  const tenantId = request.headers.get("x-tenant-id");
-  const userId = request.headers.get("x-user-id");
+  const jwtIdentity = await resolveJwtIdentityFromHeaders(request.headers);
 
-  if (tenantId && userId) {
+  if (jwtIdentity) {
     return {
       ok: true,
       identity: {
-        tenantId,
-        userId,
+        tenantId: jwtIdentity.tenantId,
+        userId: jwtIdentity.userId,
         traceId,
-        source: "headers",
+        source: "jwt",
       },
     };
   }
 
-  const allowQueryFallback =
-    options.allowQueryFallback === true && env.ALLOW_INSECURE_CONTEXT === "1";
-
-  if (allowQueryFallback) {
-    const { searchParams } = new URL(request.url);
-    const fallbackTenantId = searchParams.get("tenantId");
-    const fallbackUserId = searchParams.get("userId");
-    if (fallbackTenantId && fallbackUserId) {
+  // Local-only escape hatch; never enable in production.
+  if (env.ALLOW_INSECURE_CONTEXT === "1") {
+    const tenantId = request.headers.get("x-tenant-id");
+    const userId = request.headers.get("x-user-id");
+    if (tenantId && userId) {
       return {
         ok: true,
         identity: {
-          tenantId: fallbackTenantId,
-          userId: fallbackUserId,
+          tenantId,
+          userId,
           traceId,
-          source: "query",
+          source: "headers",
         },
       };
     }
@@ -71,8 +61,7 @@ export function resolveRequestIdentity(
     ok: false,
     traceId,
     status: 401,
-    error:
-      "Missing identity context. Require x-tenant-id and x-user-id headers (or query fallback only when ALLOW_INSECURE_CONTEXT=1).",
+    error: "Unauthorized request. Provide a valid JWT bearer token.",
   };
 }
 

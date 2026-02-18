@@ -185,21 +185,32 @@ type ChatState = {
 
 ### 6.3 关键环境变量
 - `DASHSCOPE_API_KEY`
+- `DASHSCOPE_MODEL`
+- `DASHSCOPE_BASE_URL`
 - `SEEKDB_HOST`
 - `SEEKDB_PORT`
 - `SEEKDB_USER`
 - `SEEKDB_PASSWORD`
 - `SEEKDB_DATABASE`
+- `AUTH_JWT_SECRET`
+- `AUTH_TENANT_CLAIM`
+- `AUTH_USER_CLAIM`
+- `ALLOW_INSECURE_CONTEXT`（仅本地调试可设为 `1`）
 
 ---
 
 ## 7. Next.js 接口设计（最小可用）
 
 ### 7.1 `POST /api/chat`
-请求头（由服务端鉴权层注入）：
+请求头（客户端需携带 JWT，服务端中间件会校验并注入身份头）：
 ```text
-x-tenant-id: t1
-x-user-id: u1
+Authorization: Bearer <jwt-token>
+```
+
+中间件注入（内部）：
+```text
+x-tenant-id: <from-jwt-claim>
+x-user-id: <from-jwt-claim>
 ```
 
 请求：
@@ -215,7 +226,7 @@ x-user-id: u1
 - 附带 `traceId` 便于排障
 
 ### 7.2 可选接口
-- `GET /api/memories`：调试查看当前身份下记忆（tenant/user 从 headers 注入）
+- `GET /api/memories`：查看当前身份下记忆（身份来自 JWT）
 - `DELETE /api/memories/:id`：用户可控删除（合规要求）
 - `POST /api/memories/compact`：手动触发摘要压缩
 
@@ -327,11 +338,17 @@ export const dynamic = "force-dynamic";
 ### 13.4 环境变量与密钥
 - 在 Vercel Project Settings 中配置：
   - `DASHSCOPE_API_KEY`
+  - `DASHSCOPE_MODEL`
+  - `DASHSCOPE_BASE_URL`
   - `SEEKDB_HOST`
   - `SEEKDB_PORT`
   - `SEEKDB_USER`
   - `SEEKDB_PASSWORD`
   - `SEEKDB_DATABASE`
+  - `AUTH_JWT_SECRET`
+  - `AUTH_TENANT_CLAIM`
+  - `AUTH_USER_CLAIM`
+  - `ALLOW_INSECURE_CONTEXT`（生产环境必须为 `0`）
 - 区分 `Preview` / `Production` 两套变量，避免测试数据污染生产记忆。
 
 ### 13.5 流式响应与超时

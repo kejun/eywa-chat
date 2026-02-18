@@ -13,6 +13,10 @@
   - `SEEKDB_USER`
   - `SEEKDB_PASSWORD`
   - `SEEKDB_DATABASE`
+  - `AUTH_JWT_SECRET`
+  - `AUTH_TENANT_CLAIM`
+  - `AUTH_USER_CLAIM`
+  - `ALLOW_INSECURE_CONTEXT`（生产必须为 `0`）
   - `CRON_SECRET`（可选）
 - Production（与 Preview 分离，不复用凭据）
 
@@ -21,16 +25,17 @@
 1. CI 通过：
    - `npm run check`
 2. 身份上下文：
-   - API 网关或鉴权层需要向后端注入：
+   - 客户端必须携带：`Authorization: Bearer <jwt-token>`
+   - 中间件负责校验 JWT，并在内部注入：
      - `x-tenant-id`
      - `x-user-id`
    - 不应依赖客户端 body 传入 tenant/user 身份。
-2. 关键路由检查：
+3. 关键路由检查：
    - `GET /api/health`
    - `POST /api/chat`
    - `GET /api/memories/search`
    - `GET /api/tools`
-3. 安全检查：
+4. 安全检查：
    - Cron 路由启用 `CRON_SECRET`
    - 无测试密钥泄露到前端
 
@@ -64,13 +69,13 @@ Authorization: Bearer <CRON_SECRET>
 可在预发环境执行：
 
 ```bash
-npm run loadtest:chat -- \
+npm run loadtest:chat:report -- \
   --url "https://<preview-domain>/api/chat" \
   --requests 100 \
   --concurrency 10 \
-  --tenant-id "t-loadtest" \
-  --user-id "u-loadtest" \
-  --output "./artifacts/loadtest-summary.json"
+  --jwt-token "<loadtest-jwt-token>" \
+  --summary-out "./artifacts/loadtest-summary.json" \
+  --report-out "./artifacts/loadtest-report.md"
 ```
 
 压测结果可按模板沉淀：`docs/PERF_REPORT_TEMPLATE.md`

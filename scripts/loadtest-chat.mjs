@@ -68,13 +68,20 @@ async function runOneRequest(input) {
   let doneEvent = false;
 
   try {
+    const requestHeaders = {
+      "content-type": "application/json",
+    };
+
+    if (input.jwtToken) {
+      requestHeaders.authorization = `Bearer ${input.jwtToken}`;
+    } else {
+      requestHeaders["x-tenant-id"] = input.tenantId;
+      requestHeaders["x-user-id"] = input.userId;
+    }
+
     const response = await fetch(input.url, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-tenant-id": input.tenantId,
-        "x-user-id": input.userId,
-      },
+      headers: requestHeaders,
       body: JSON.stringify({
         threadId: `${input.threadPrefix}-${input.id}`,
         message: input.message,
@@ -160,6 +167,7 @@ async function run() {
   const timeoutMs = readNumberArg("timeout-ms", 30000);
   const tenantId = readArg("tenant-id", "t-loadtest");
   const userId = readArg("user-id", "u-loadtest");
+  const jwtToken = readArg("jwt-token", "");
   const message = readArg("message", "请记住我偏好高铁，并回复已记录。");
   const threadPrefix = readArg("thread-prefix", "loadtest");
   const outputPath = readArg("output", "");
@@ -181,6 +189,7 @@ async function run() {
         url,
         tenantId,
         userId,
+        jwtToken,
         message,
         threadPrefix,
         timeoutMs,
@@ -215,6 +224,7 @@ async function run() {
       timeoutMs,
       tenantId,
       userId,
+      authMode: jwtToken ? "jwt" : "header-fallback",
       threadPrefix,
       message,
     },

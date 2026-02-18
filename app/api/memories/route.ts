@@ -30,9 +30,7 @@ const UpsertPayloadSchema = z.object({
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
-  const identityResult = resolveRequestIdentity(request, {
-    allowQueryFallback: true,
-  });
+  const identityResult = await resolveRequestIdentity(request);
   if (!identityResult.ok) {
     return NextResponse.json(
       { error: identityResult.error },
@@ -87,7 +85,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
-  const identityResult = resolveRequestIdentity(request);
+  const identityResult = await resolveRequestIdentity(request);
   if (!identityResult.ok) {
     return NextResponse.json(
       { error: identityResult.error },

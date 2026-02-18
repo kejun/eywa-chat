@@ -19,8 +19,8 @@
 - 超时：
 - 测试消息：
 - 身份上下文：
-  - `x-tenant-id`：
-  - `x-user-id`：
+  - JWT claim tenantId：
+  - JWT claim userId：
 
 ## 3. 执行命令
 
@@ -29,8 +29,7 @@ npm run loadtest:chat -- \
   --url "<chat-endpoint>" \
   --requests 100 \
   --concurrency 10 \
-  --tenant-id "t-loadtest" \
-  --user-id "u-loadtest" \
+  --jwt-token "<loadtest-jwt-token>" \
   --output "./artifacts/loadtest-summary.json"
 ```
 

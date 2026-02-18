@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const identityResult = resolveRequestIdentity(request);
+  const identityResult = await resolveRequestIdentity(request);
   if (!identityResult.ok) {
     recordMetric({
       name: "chat.request.total",
