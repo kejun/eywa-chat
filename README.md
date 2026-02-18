@@ -432,3 +432,11 @@ Skill/MCP 执行后不应全量落库，建议仅沉淀“高价值结果”：
 3) Next.js API 与前端流式交互  
 4) Skill Registry + MCP Adapter 模块  
 5) 观测与治理模块。
+
+---
+
+## 15. 执行计划（落地文档）
+
+详细的里程碑、Issue 清单、验收标准见：
+
+- `docs/IMPLEMENTATION_PLAN.md`
