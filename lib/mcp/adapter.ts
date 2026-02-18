@@ -28,7 +28,7 @@ function buildEchoTool(): AnyMcpTool {
     text: z.string().min(1),
   });
 
-  return {
+  const tool: McpToolDefinition<typeof inputSchema> = {
     name: "echo_tool",
     description: "回显文本（用于 MCP 链路验证）",
     inputSchema,
@@ -62,6 +62,8 @@ function buildEchoTool(): AnyMcpTool {
       };
     },
   };
+
+  return tool;
 }
 
 function buildCurrentTimeTool(): AnyMcpTool {
@@ -69,7 +71,7 @@ function buildCurrentTimeTool(): AnyMcpTool {
     timezone: z.string().default("Asia/Shanghai"),
   });
 
-  return {
+  const tool: McpToolDefinition<typeof inputSchema> = {
     name: "current_time",
     description: "获取当前时间（用于工具链路验证）",
     inputSchema,
@@ -87,6 +89,8 @@ function buildCurrentTimeTool(): AnyMcpTool {
       };
     },
   };
+
+  return tool;
 }
 
 export class McpAdapter {

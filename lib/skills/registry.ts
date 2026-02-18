@@ -3,12 +3,12 @@ import type { SkillContext, SkillDefinition, SkillResult } from "@/lib/skills/ty
 
 type AnySkillDefinition = SkillDefinition<z.ZodTypeAny>;
 
-function buildPreferenceSkill(): AnySkillDefinition {
+function buildPreferenceSkill() {
   const inputSchema = z.object({
     preference: z.string().min(1),
   });
 
-  return {
+  const skill: SkillDefinition<typeof inputSchema> = {
     name: "save_preference",
     description: "抽取并固化用户偏好",
     inputSchema,
@@ -53,14 +53,16 @@ function buildPreferenceSkill(): AnySkillDefinition {
       };
     },
   };
+
+  return skill;
 }
 
-function buildTaskCaptureSkill(): AnySkillDefinition {
+function buildTaskCaptureSkill() {
   const inputSchema = z.object({
     task: z.string().min(1),
   });
 
-  return {
+  const skill: SkillDefinition<typeof inputSchema> = {
     name: "capture_task",
     description: "识别并记录待办任务",
     inputSchema,
@@ -104,6 +106,8 @@ function buildTaskCaptureSkill(): AnySkillDefinition {
       };
     },
   };
+
+  return skill;
 }
 
 export class SkillRegistry {
