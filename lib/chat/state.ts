@@ -7,6 +7,38 @@ export const ChatStateAnnotation = Annotation.Root({
   threadId: Annotation<string>,
   userMessage: Annotation<string>,
   traceId: Annotation<string>,
+  plannedAction: Annotation<"chat" | "skill" | "mcp">({
+    reducer: (_left, right) => right,
+    default: () => "chat",
+  }),
+  selectedSkill: Annotation<string>({
+    reducer: (_left, right) => right,
+    default: () => "",
+  }),
+  skillArgs: Annotation<Record<string, unknown>>({
+    reducer: (_left, right) => right,
+    default: () => ({}),
+  }),
+  selectedTool: Annotation<string>({
+    reducer: (_left, right) => right,
+    default: () => "",
+  }),
+  toolArgs: Annotation<Record<string, unknown>>({
+    reducer: (_left, right) => right,
+    default: () => ({}),
+  }),
+  actionSummary: Annotation<string>({
+    reducer: (_left, right) => right,
+    default: () => "",
+  }),
+  actionValidationError: Annotation<string>({
+    reducer: (_left, right) => right,
+    default: () => "",
+  }),
+  actionMemoryCandidates: Annotation<UpsertMemoryInput[]>({
+    reducer: (_left, right) => right,
+    default: () => [],
+  }),
   shouldRetrieve: Annotation<boolean>({
     reducer: (_left, right) => right,
     default: () => true,
