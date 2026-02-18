@@ -13,6 +13,7 @@ const EnvSchema = z.object({
   SEEKDB_USER: z.string().min(1, "SEEKDB_USER is required"),
   SEEKDB_PASSWORD: z.string().min(1, "SEEKDB_PASSWORD is required"),
   SEEKDB_DATABASE: z.string().min(1, "SEEKDB_DATABASE is required"),
+  CRON_SECRET: z.string().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

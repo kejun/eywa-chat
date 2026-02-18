@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { memoryRepository, MemoryTypeSchema } from "@/lib/memory";
+import { recordMetric } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   const { searchParams } = new URL(request.url);
   const tenantId = searchParams.get("tenantId");
   const userId = searchParams.get("userId");
@@ -46,6 +48,17 @@ export async function GET(request: Request) {
       .filter((item): item is Extract<typeof item, { success: true }> => item.success)
       .map((item) => item.data),
     nResults: Number.isFinite(nResults) ? Math.max(1, nResults) : 8,
+  });
+
+  recordMetric({
+    name: "memory.search.duration",
+    value: Date.now() - startedAt,
+    unit: "ms",
+  });
+  recordMetric({
+    name: "memory.search.count",
+    value: entries.length,
+    unit: "count",
   });
 
   return NextResponse.json({ memories: entries });

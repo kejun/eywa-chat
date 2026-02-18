@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { memoryRepository, MemoryTypeSchema } from "@/lib/memory";
+import { recordMetric } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ const UpsertPayloadSchema = z.object({
 });
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   const { searchParams } = new URL(request.url);
   const tenantId = searchParams.get("tenantId");
   const userId = searchParams.get("userId");
@@ -64,10 +66,22 @@ export async function GET(request: Request) {
     offset: Number.isFinite(offset) ? Math.max(0, offset) : 0,
   });
 
+  recordMetric({
+    name: "memory.list.duration",
+    value: Date.now() - startedAt,
+    unit: "ms",
+  });
+  recordMetric({
+    name: "memory.list.count",
+    value: memories.length,
+    unit: "count",
+  });
+
   return NextResponse.json({ memories });
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const payload = await request.json();
   const parsed = UpsertPayloadSchema.safeParse(payload);
 
@@ -82,5 +96,15 @@ export async function POST(request: Request) {
   }
 
   const result = await memoryRepository.upsertMemories(parsed.data.memories);
+  recordMetric({
+    name: "memory.upsert.duration",
+    value: Date.now() - startedAt,
+    unit: "ms",
+  });
+  recordMetric({
+    name: "memory.upsert.count",
+    value: result.length,
+    unit: "count",
+  });
   return NextResponse.json({ upserted: result.length, result });
 }

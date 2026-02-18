@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { runChatGraph } from "@/lib/chat";
 import { logger } from "@/lib/logger";
+import { recordMetric } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,10 +40,17 @@ function createSseEncoder() {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const payload = await request.json().catch(() => null);
   const parsed = ChatRequestSchema.safeParse(payload);
 
   if (!parsed.success) {
+    recordMetric({
+      name: "chat.request.total",
+      value: 1,
+      unit: "count",
+      tags: { status: "bad_request" },
+    });
     return new Response(
       JSON.stringify({
         error: "Invalid chat payload",
@@ -88,6 +96,29 @@ export async function POST(request: Request) {
           retrievedCount: finalState.retrievedMemories.length,
           persistedCount: finalState.persistedCount,
         });
+
+        recordMetric({
+          name: "chat.request.total",
+          value: 1,
+          unit: "count",
+          tags: { status: "success" },
+        });
+        recordMetric({
+          name: "chat.request.duration",
+          value: Date.now() - startedAt,
+          unit: "ms",
+          tags: { status: "success" },
+        });
+        recordMetric({
+          name: "chat.memories.retrieved",
+          value: finalState.retrievedMemories.length,
+          unit: "count",
+        });
+        recordMetric({
+          name: "chat.memories.persisted",
+          value: finalState.persistedCount,
+          unit: "count",
+        });
       } catch (error) {
         logger.error("chat-route-failed", {
           traceId,
@@ -101,6 +132,19 @@ export async function POST(request: Request) {
           await wait(15);
         }
         pushEvent("done", { traceId, degraded: true });
+
+        recordMetric({
+          name: "chat.request.total",
+          value: 1,
+          unit: "count",
+          tags: { status: "degraded" },
+        });
+        recordMetric({
+          name: "chat.request.duration",
+          value: Date.now() - startedAt,
+          unit: "ms",
+          tags: { status: "degraded" },
+        });
       }
 
       controller.close();

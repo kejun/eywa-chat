@@ -312,6 +312,31 @@ export class MemoryRepository {
     });
   }
 
+  async deleteExpiredMemories(scope?: { tenantId?: string; userId?: string }): Promise<void> {
+    const collection = await getMemoryCollection();
+    const where: Record<string, unknown> = {
+      expiresAt: {
+        $lt: Date.now(),
+      },
+    };
+
+    if (scope?.tenantId) {
+      where.tenantId = scope.tenantId;
+    }
+    if (scope?.userId) {
+      where.userId = scope.userId;
+    }
+
+    await collection.delete({
+      where: where as Where,
+    });
+  }
+
+  async countAllMemories(): Promise<number> {
+    const collection = await getMemoryCollection();
+    return collection.count();
+  }
+
   async touchMemoryAccess(ids: string[]): Promise<void> {
     if (ids.length === 0) {
       return;

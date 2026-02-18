@@ -440,3 +440,11 @@ Skill/MCP 执行后不应全量落库，建议仅沉淀“高价值结果”：
 详细的里程碑、Issue 清单、验收标准见：
 
 - `docs/IMPLEMENTATION_PLAN.md`
+
+---
+
+## 16. 上线运行手册
+
+Vercel 发布、Cron、观测与回滚说明见：
+
+- `docs/DEPLOYMENT_RUNBOOK.md`
