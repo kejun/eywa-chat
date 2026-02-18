@@ -23,7 +23,7 @@ function timeoutPromise<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-function buildEchoTool(): AnyMcpTool {
+function buildEchoTool() {
   const inputSchema = z.object({
     text: z.string().min(1),
   });
@@ -66,7 +66,7 @@ function buildEchoTool(): AnyMcpTool {
   return tool;
 }
 
-function buildCurrentTimeTool(): AnyMcpTool {
+function buildCurrentTimeTool() {
   const inputSchema = z.object({
     timezone: z.string().default("Asia/Shanghai"),
   });
@@ -96,8 +96,8 @@ function buildCurrentTimeTool(): AnyMcpTool {
 export class McpAdapter {
   private readonly tools = new Map<string, AnyMcpTool>();
 
-  register(tool: AnyMcpTool) {
-    this.tools.set(tool.name, tool);
+  register<TSchema extends z.ZodTypeAny>(tool: McpToolDefinition<TSchema>) {
+    this.tools.set(tool.name, tool as AnyMcpTool);
   }
 
   listTools() {

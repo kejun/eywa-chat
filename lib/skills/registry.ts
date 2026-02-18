@@ -113,8 +113,8 @@ function buildTaskCaptureSkill() {
 export class SkillRegistry {
   private readonly skills = new Map<string, AnySkillDefinition>();
 
-  register(skill: AnySkillDefinition) {
-    this.skills.set(skill.name, skill);
+  register<TSchema extends z.ZodTypeAny>(skill: SkillDefinition<TSchema>) {
+    this.skills.set(skill.name, skill as AnySkillDefinition);
   }
 
   list() {
