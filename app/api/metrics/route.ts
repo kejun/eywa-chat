@@ -16,16 +16,3 @@ export async function DELETE() {
     ok: true,
   });
 }
-import { NextResponse } from "next/server";
-import { getMetricsSnapshot } from "@/lib/observability";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-export async function GET() {
-  const metrics = getMetricsSnapshot();
-  return NextResponse.json({
-    points: metrics.length,
-    metrics,
-  });
-}
