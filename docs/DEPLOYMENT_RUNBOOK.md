@@ -20,6 +20,11 @@
 
 1. CI 通过：
    - `npm run check`
+2. 身份上下文：
+   - API 网关或鉴权层需要向后端注入：
+     - `x-tenant-id`
+     - `x-user-id`
+   - 不应依赖客户端 body 传入 tenant/user 身份。
 2. 关键路由检查：
    - `GET /api/health`
    - `POST /api/chat`
@@ -53,6 +58,22 @@ Authorization: Bearer <CRON_SECRET>
 - `chat.memories.retrieved`
 - `chat.memories.persisted`
 - `cron.memory_ttl.deleted_count`
+
+## 4.1 压测建议
+
+可在预发环境执行：
+
+```bash
+npm run loadtest:chat -- \
+  --url "https://<preview-domain>/api/chat" \
+  --requests 100 \
+  --concurrency 10 \
+  --tenant-id "t-loadtest" \
+  --user-id "u-loadtest" \
+  --output "./artifacts/loadtest-summary.json"
+```
+
+压测结果可按模板沉淀：`docs/PERF_REPORT_TEMPLATE.md`
 
 ## 5. 回滚策略
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveRequestIdentity } from "@/lib/auth/context";
 import { memoryRepository, MemoryTypeSchema } from "@/lib/memory";
 import { recordMetric } from "@/lib/observability";
 
@@ -7,18 +8,32 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
+  const identityResult = resolveRequestIdentity(request, {
+    allowQueryFallback: true,
+  });
+  if (!identityResult.ok) {
+    return NextResponse.json(
+      { error: identityResult.error },
+      {
+        status: identityResult.status,
+        headers: {
+          "x-trace-id": identityResult.traceId,
+        },
+      },
+    );
+  }
+
+  const { identity } = identityResult;
   const { searchParams } = new URL(request.url);
-  const tenantId = searchParams.get("tenantId");
-  const userId = searchParams.get("userId");
   const queryText = searchParams.get("queryText");
   const threadId = searchParams.get("threadId") ?? undefined;
   const nResults = Number(searchParams.get("nResults") ?? 8);
   const rawMemoryTypes = searchParams.getAll("memoryType");
 
-  if (!tenantId || !userId || !queryText) {
+  if (!queryText) {
     return NextResponse.json(
       {
-        error: "tenantId, userId, and queryText are required",
+        error: "queryText is required",
       },
       { status: 400 },
     );
@@ -40,8 +55,8 @@ export async function GET(request: Request) {
   }
 
   const entries = await memoryRepository.retrieveMemories({
-    tenantId,
-    userId,
+    tenantId: identity.tenantId,
+    userId: identity.userId,
     queryText,
     threadId,
     memoryTypes: memoryTypes

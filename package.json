@@ -14,7 +14,8 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck"
+    "check": "npm run lint && npm run typecheck",
+    "loadtest:chat": "node scripts/loadtest-chat.mjs"
   },
   "repository": {
     "type": "git",

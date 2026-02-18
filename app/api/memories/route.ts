@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { resolveRequestIdentity } from "@/lib/auth/context";
 import { memoryRepository, MemoryTypeSchema } from "@/lib/memory";
 import { recordMetric } from "@/lib/observability";
 
@@ -10,8 +11,6 @@ const UpsertPayloadSchema = z.object({
   memories: z
     .array(
       z.object({
-        tenantId: z.string().min(1),
-        userId: z.string().min(1),
         threadId: z.string().min(1).optional(),
         memoryType: MemoryTypeSchema,
         key: z.string().min(1),
@@ -31,17 +30,23 @@ const UpsertPayloadSchema = z.object({
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
-  const { searchParams } = new URL(request.url);
-  const tenantId = searchParams.get("tenantId");
-  const userId = searchParams.get("userId");
-
-  if (!tenantId || !userId) {
+  const identityResult = resolveRequestIdentity(request, {
+    allowQueryFallback: true,
+  });
+  if (!identityResult.ok) {
     return NextResponse.json(
-      { error: "tenantId and userId are required" },
-      { status: 400 },
+      { error: identityResult.error },
+      {
+        status: identityResult.status,
+        headers: {
+          "x-trace-id": identityResult.traceId,
+        },
+      },
     );
   }
 
+  const { identity } = identityResult;
+  const { searchParams } = new URL(request.url);
   const memoryType = searchParams.get("memoryType");
   const limit = Number(searchParams.get("limit") ?? 20);
   const offset = Number(searchParams.get("offset") ?? 0);
@@ -59,8 +64,8 @@ export async function GET(request: Request) {
   }
 
   const memories = await memoryRepository.listMemories({
-    tenantId,
-    userId,
+    tenantId: identity.tenantId,
+    userId: identity.userId,
     memoryType: parsedMemoryType,
     limit: Number.isFinite(limit) ? Math.max(1, limit) : 20,
     offset: Number.isFinite(offset) ? Math.max(0, offset) : 0,
@@ -82,6 +87,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
+  const identityResult = resolveRequestIdentity(request);
+  if (!identityResult.ok) {
+    return NextResponse.json(
+      { error: identityResult.error },
+      {
+        status: identityResult.status,
+        headers: {
+          "x-trace-id": identityResult.traceId,
+        },
+      },
+    );
+  }
+
+  const { identity } = identityResult;
   const payload = await request.json();
   const parsed = UpsertPayloadSchema.safeParse(payload);
 
@@ -95,7 +114,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await memoryRepository.upsertMemories(parsed.data.memories);
+  const result = await memoryRepository.upsertMemories(
+    parsed.data.memories.map((memory) => ({
+      ...memory,
+      tenantId: identity.tenantId,
+      userId: identity.userId,
+    })),
+  );
   recordMetric({
     name: "memory.upsert.duration",
     value: Date.now() - startedAt,

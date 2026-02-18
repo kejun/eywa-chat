@@ -196,11 +196,15 @@ type ChatState = {
 ## 7. Next.js 接口设计（最小可用）
 
 ### 7.1 `POST /api/chat`
+请求头（由服务端鉴权层注入）：
+```text
+x-tenant-id: t1
+x-user-id: u1
+```
+
 请求：
 ```json
 {
-  "tenantId": "t1",
-  "userId": "u1",
   "threadId": "th-001",
   "message": "我下周去上海出差，帮我记住我偏好高铁"
 }
@@ -211,7 +215,7 @@ type ChatState = {
 - 附带 `traceId` 便于排障
 
 ### 7.2 可选接口
-- `GET /api/memories?userId=...`：调试查看记忆
+- `GET /api/memories`：调试查看当前身份下记忆（tenant/user 从 headers 注入）
 - `DELETE /api/memories/:id`：用户可控删除（合规要求）
 - `POST /api/memories/compact`：手动触发摘要压缩
 
@@ -448,3 +452,4 @@ Skill/MCP 执行后不应全量落库，建议仅沉淀“高价值结果”：
 Vercel 发布、Cron、观测与回滚说明见：
 
 - `docs/DEPLOYMENT_RUNBOOK.md`
+- `docs/PERF_REPORT_TEMPLATE.md`

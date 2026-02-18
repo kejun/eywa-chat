@@ -1,5 +1,5 @@
-import { headers } from "next/headers";
 import { z } from "zod";
+import { resolveRequestIdentity } from "@/lib/auth/context";
 import { runChatGraph } from "@/lib/chat";
 import { logger } from "@/lib/logger";
 import { recordMetric } from "@/lib/observability";
@@ -8,8 +8,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ChatRequestSchema = z.object({
-  tenantId: z.string().min(1),
-  userId: z.string().min(1),
   threadId: z.string().min(1),
   message: z.string().min(1),
 });
@@ -65,8 +63,31 @@ export async function POST(request: Request) {
     );
   }
 
-  const requestHeaders = await headers();
-  const traceId = requestHeaders.get("x-trace-id") ?? crypto.randomUUID();
+  const identityResult = resolveRequestIdentity(request);
+  if (!identityResult.ok) {
+    recordMetric({
+      name: "chat.request.total",
+      value: 1,
+      unit: "count",
+      tags: { status: "unauthorized" },
+    });
+
+    return new Response(
+      JSON.stringify({
+        error: identityResult.error,
+      }),
+      {
+        status: identityResult.status,
+        headers: {
+          "content-type": "application/json",
+          "x-trace-id": identityResult.traceId,
+        },
+      },
+    );
+  }
+
+  const { identity } = identityResult;
+  const traceId = identity.traceId;
   const sendSse = createSseEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -79,8 +100,8 @@ export async function POST(request: Request) {
 
       try {
         const finalState = await runChatGraph({
-          tenantId: parsed.data.tenantId,
-          userId: parsed.data.userId,
+          tenantId: identity.tenantId,
+          userId: identity.userId,
           threadId: parsed.data.threadId,
           userMessage: parsed.data.message,
           traceId,

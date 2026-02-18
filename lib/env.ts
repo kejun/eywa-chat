@@ -13,6 +13,7 @@ const EnvSchema = z.object({
   SEEKDB_USER: z.string().min(1, "SEEKDB_USER is required"),
   SEEKDB_PASSWORD: z.string().min(1, "SEEKDB_PASSWORD is required"),
   SEEKDB_DATABASE: z.string().min(1, "SEEKDB_DATABASE is required"),
+  ALLOW_INSECURE_CONTEXT: z.enum(["0", "1"]).default("0"),
   CRON_SECRET: z.string().optional(),
 });
 
