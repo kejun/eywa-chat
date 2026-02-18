@@ -475,3 +475,4 @@ Vercel 发布、Cron、观测与回滚说明见：
 
 - `npm run auth:jwt:generate -- --tenant-id t1 --user-id u1`
 - `npm run loadtest:chat:report -- --url <endpoint> --jwt-token <token>`
+- `npm run loadtest:chat:report:autojwt -- --url <endpoint> --tenant-id t1 --user-id u1`

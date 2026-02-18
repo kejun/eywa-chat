@@ -37,6 +37,14 @@ npm run loadtest:chat -- \
   --concurrency 10 \
   --jwt-token "<loadtest-jwt-token>" \
   --output "./artifacts/loadtest-summary.json"
+
+# 或一键生成 JWT + 压测 + 报告
+npm run loadtest:chat:report:autojwt -- \
+  --url "<chat-endpoint>" \
+  --requests 100 \
+  --concurrency 10 \
+  --tenant-id "t-loadtest" \
+  --user-id "u-loadtest"
 ```
 
 ## 4. 结果摘要

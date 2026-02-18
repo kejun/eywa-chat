@@ -92,6 +92,19 @@ npm run loadtest:chat:report -- \
   --report-out "./artifacts/loadtest-report.md"
 ```
 
+也可以直接使用自动生成 JWT 的一键命令：
+
+```bash
+npm run loadtest:chat:report:autojwt -- \
+  --url "https://<preview-domain>/api/chat" \
+  --requests 100 \
+  --concurrency 10 \
+  --tenant-id "t-loadtest" \
+  --user-id "u-loadtest" \
+  --summary-out "./artifacts/loadtest-summary.json" \
+  --report-out "./artifacts/loadtest-report.md"
+```
+
 压测结果可按模板沉淀：`docs/PERF_REPORT_TEMPLATE.md`
 
 ## 5. 回滚策略

@@ -18,7 +18,8 @@
     "auth:jwt:generate": "node scripts/generate-jwt.mjs",
     "loadtest:chat": "node scripts/loadtest-chat.mjs",
     "loadtest:report": "node scripts/render-loadtest-report.mjs",
-    "loadtest:chat:report": "node scripts/loadtest-chat-and-report.mjs"
+    "loadtest:chat:report": "node scripts/loadtest-chat-and-report.mjs",
+    "loadtest:chat:report:autojwt": "node scripts/loadtest-chat-report-with-jwt.mjs"
   },
   "repository": {
     "type": "git",
