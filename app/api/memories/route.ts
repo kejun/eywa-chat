@@ -44,18 +44,22 @@ export async function GET(request: Request) {
   const limit = Number(searchParams.get("limit") ?? 20);
   const offset = Number(searchParams.get("offset") ?? 0);
 
-  const parsedMemoryType = memoryType ? MemoryTypeSchema.safeParse(memoryType) : undefined;
-  if (memoryType && !parsedMemoryType?.success) {
-    return NextResponse.json(
-      { error: "Invalid memoryType", issues: parsedMemoryType.error.issues },
-      { status: 400 },
-    );
+  let parsedMemoryType: z.infer<typeof MemoryTypeSchema> | undefined;
+  if (memoryType) {
+    const result = MemoryTypeSchema.safeParse(memoryType);
+    if (!result.success) {
+      return NextResponse.json(
+        { error: "Invalid memoryType", issues: result.error.issues },
+        { status: 400 },
+      );
+    }
+    parsedMemoryType = result.data;
   }
 
   const memories = await memoryRepository.listMemories({
     tenantId,
     userId,
-    memoryType: parsedMemoryType?.success ? parsedMemoryType.data : undefined,
+    memoryType: parsedMemoryType,
     limit: Number.isFinite(limit) ? Math.max(1, limit) : 20,
     offset: Number.isFinite(offset) ? Math.max(0, offset) : 0,
   });
