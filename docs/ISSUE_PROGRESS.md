@@ -2,7 +2,7 @@
 
 > Updated at: 2026-02-18  
 > Branch: `cursor/chatbot-memory-technical-spec-0334`  
-> Latest commit: `af636f1` (will advance with subsequent commits)
+> Latest commit: see branch HEAD (`git rev-parse --short HEAD`)
 
 ## 说明
 

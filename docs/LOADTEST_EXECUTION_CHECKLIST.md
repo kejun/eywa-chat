@@ -49,6 +49,14 @@ npm run loadtest:scenarios -- \
 - [ ] `baseline-summary.json` + `baseline-report.md`
 - [ ] `stress-summary.json` + `stress-report.md`
 - [ ] `OVERVIEW.md`（汇总与 PASS/FAIL 结论）
+- [ ] `ISSUE-26-CLOSURE.md`（关单草稿）
+
+生成关单草稿：
+
+```bash
+npm run issue26:prepare -- \
+  --report-dir "./artifacts/loadtest-scenarios"
+```
 
 ---
 
@@ -64,7 +72,8 @@ npm run loadtest:scenarios -- \
 ## 6. 收口动作（Issue）
 
 1. 先在 issue #26 贴上：
-   - `OVERVIEW.md` 结论
+   - `ISSUE-26-CLOSURE.md` 内容（优先）
+   - `OVERVIEW.md` 结论（补充）
    - 各场景 markdown 报告路径
 2. 若全部 PASS，关闭：
    - `#26`

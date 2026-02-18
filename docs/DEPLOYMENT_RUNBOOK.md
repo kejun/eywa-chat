@@ -105,6 +105,23 @@ npm run loadtest:chat:report:autojwt -- \
   --report-out "./artifacts/loadtest-report.md"
 ```
 
+场景压测（含阈值判断与总览）：
+
+```bash
+npm run loadtest:scenarios -- \
+  --url "https://<preview-domain>/api/chat" \
+  --tenant-id "t-loadtest" \
+  --user-id "u-loadtest" \
+  --report-dir "./artifacts/loadtest-scenarios"
+```
+
+生成 #26 关单草稿：
+
+```bash
+npm run issue26:prepare -- \
+  --report-dir "./artifacts/loadtest-scenarios"
+```
+
 压测结果可按模板沉淀：`docs/PERF_REPORT_TEMPLATE.md`
 完整执行清单见：`docs/LOADTEST_EXECUTION_CHECKLIST.md`
 
