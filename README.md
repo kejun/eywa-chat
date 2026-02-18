@@ -293,7 +293,57 @@ type ChatState = {
 
 ---
 
-这份 spec 可以直接作为实现蓝图；下一步可按此拆分为：
+## 13. Vercel 部署补充（新增）
+
+后续部署在 Vercel 时，建议在设计阶段就做以下约束：
+
+### 13.1 运行时选择
+- `api/chat` 与所有需要访问 SeekDB 的接口，统一使用 **Node.js Runtime**。
+- 不建议放在 Edge Runtime（数据库驱动与 TCP 连接能力受限，且调试复杂度更高）。
+
+Next.js Route Handler 示例：
+```ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+```
+
+### 13.2 SeekDB 连接管理（Serverless 关键点）
+- Serverless 场景下函数实例会频繁冷启动，避免“每次请求都新建连接”。
+- 使用 `globalThis` 缓存 `SeekdbClient`（warm 实例复用连接）。
+- 为连接失败增加重试与超时控制，避免请求堆积。
+- 设置合理并发上限，防止短时流量导致连接风暴。
+
+### 13.3 网络与区域
+- Vercel region 尽量靠近 SeekDB 与百炼服务部署区域，降低 RTT。
+- 若 SeekDB 仅内网可访问，需要提前设计网络方案：
+  - 方案 A：开放公网入口 + 白名单 + TLS；
+  - 方案 B：在同 VPC 部署中间层服务，对 Vercel 暴露 HTTPS API（推荐更易控）。
+
+### 13.4 环境变量与密钥
+- 在 Vercel Project Settings 中配置：
+  - `DASHSCOPE_API_KEY`
+  - `SEEKDB_HOST`
+  - `SEEKDB_PORT`
+  - `SEEKDB_USER`
+  - `SEEKDB_PASSWORD`
+  - `SEEKDB_DATABASE`
+- 区分 `Preview` / `Production` 两套变量，避免测试数据污染生产记忆。
+
+### 13.5 流式响应与超时
+- `POST /api/chat` 采用流式输出（SSE 或 Web Streams）。
+- 长链路节点（检索+生成+写回）要设置超时与降级：
+  - 检索失败：回退无记忆回答；
+  - 写回失败：不影响当次回复，异步补偿。
+
+### 13.6 定时任务（可选）
+- 用 Vercel Cron 执行离线任务：
+  - 记忆摘要压缩
+  - 过期记忆清理（TTL）
+  - 低质量记忆回收
+
+---
+
+这份 spec 可以直接作为实现蓝图；并已兼容后续 Vercel 部署约束。下一步可按此拆分为：
 1) 数据层模块（SeekDB Repository）  
 2) LangGraph 节点模块  
 3) Next.js API 与前端流式交互  
