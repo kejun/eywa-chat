@@ -7,6 +7,7 @@
 - 支持以下记忆能力：
   - **短期记忆**：同一会话内上下文连续（线程级）。
   - **长期记忆**：跨会话保存用户偏好、事实、任务进度（用户级）。
+- 支持**MCP 工具调用**与**Skills 能力编排**（用于外部系统操作和复杂任务复用）。
 - 检索层使用 seekdb-js，支持：
   - 语义向量检索（`query`）
   - 混合检索（`hybridSearch`，RRF 融合）
@@ -343,8 +344,91 @@ export const dynamic = "force-dynamic";
 
 ---
 
-这份 spec 可以直接作为实现蓝图；并已兼容后续 Vercel 部署约束。下一步可按此拆分为：
+## 14. MCP 与 Skills 支持（新增）
+
+> 说明：系统实现不依赖 context7；外部能力扩展统一通过 MCP 与 Skills 机制完成。
+
+### 14.1 设计目标
+- **MCP（Model Context Protocol）**：统一接入外部工具与资源（如工单、日历、CRM、内部知识接口）。
+- **Skills**：将“可复用任务流程”封装为高层能力（如“创建出差计划”“汇总周报”“生成采购清单”）。
+- 让模型从“只会回答”升级为“可执行任务 + 可持续记忆”的 agent。
+
+### 14.2 架构落点
+```text
+User Message
+   -> LangGraph Planner
+      -> Skill Router (是否命中某个 Skill)
+         -> Skill Executor (多步逻辑)
+      -> MCP Router (选择 MCP server/tool)
+         -> MCP Tool Call
+      -> Memory Writer (写回执行结果/用户偏好)
+```
+
+### 14.3 LangGraph 节点扩展建议
+在现有节点基础上新增：
+1. `planActions`
+   - 判断本轮是“直接回答”还是“调用 Skill/MCP”。
+2. `routeSkill`
+   - 依据意图与参数完整度选择 Skill。
+3. `executeSkill`
+   - 执行结构化任务（可内部调用多个 MCP 工具）。
+4. `routeMcpTool`
+   - 选择具体 MCP server 与 tool。
+5. `executeMcpTool`
+   - 执行工具调用并返回结果。
+6. `validateToolResult`
+   - 校验输出结构、必要字段、业务约束。
+7. `persistActionMemory`
+   - 将关键执行结果写入长期记忆（便于后续追问）。
+
+### 14.4 Skills 规范（建议）
+每个 Skill 建议采用统一描述：
+- `name`: 技能名（唯一）
+- `description`: 适用场景
+- `inputSchema`: 入参 JSON Schema
+- `steps`: 执行步骤（可包含 MCP 调用）
+- `outputSchema`: 输出 JSON Schema
+- `onFailure`: 失败回退策略
+
+示例：
+```ts
+type SkillDefinition = {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  run: (ctx: SkillContext) => Promise<SkillResult>;
+};
+```
+
+### 14.5 MCP 调用治理
+- **白名单机制**：仅允许调用注册过的 server/tool。
+- **参数校验**：调用前做 schema 校验，避免危险输入。
+- **超时与重试**：单次调用超时（如 8-15s），幂等工具可重试。
+- **审计日志**：记录 `toolName/args/resultSummary/traceId`。
+- **最小权限**：按租户/用户下发工具权限，不做全量开放。
+
+### 14.6 与记忆系统的结合
+Skill/MCP 执行后不应全量落库，建议仅沉淀“高价值结果”：
+- 用户稳定偏好（例：默认高铁、偏好英文邮件）
+- 持续任务状态（例：报销流程进行到审批节点）
+- 外部系统关键事实（例：订单号、预约时间）
+
+推荐 metadata 增补：
+- `sourceType`: `"chat" | "mcp" | "skill"`
+- `sourceName`: MCP tool 名或 Skill 名
+- `confidence`: number（0-1）
+- `actionTraceId`: string
+
+### 14.7 Vercel 上的实现提醒（MCP/Skills）
+- MCP/Skills 执行链路放在 Node.js Runtime。
+- 技能注册表（Skill Registry）建议以代码静态注册 + 配置开关。
+- 外部调用较慢时可拆成“同步回复 + 异步补偿”（防止函数超时）。
+
+---
+
+这份 spec 可以直接作为实现蓝图；并已兼容 Vercel + MCP + Skills 约束。下一步可按此拆分为：
 1) 数据层模块（SeekDB Repository）  
-2) LangGraph 节点模块  
+2) LangGraph 节点模块（含 MCP/Skills 路由）  
 3) Next.js API 与前端流式交互  
-4) 观测与治理模块。
+4) Skill Registry + MCP Adapter 模块  
+5) 观测与治理模块。
