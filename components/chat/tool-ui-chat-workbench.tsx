@@ -72,7 +72,13 @@ type ActionHistoryEntry = {
 type ReplayDraftState = {
   sourceLabel: string;
   action: ActionDonePayload;
+  originalMessage: string;
   message: string;
+};
+
+type ReplayDiffLine = {
+  kind: "same" | "removed" | "added" | "truncated";
+  text: string;
 };
 
 type ActionHistoryGroupKey = ActionDonePayload["plannedAction"];
@@ -149,6 +155,44 @@ function buildDraftSubject(content: string) {
     return "对话回复草稿";
   }
   return `回复草稿：${toSingleLine(primary, 36)}`;
+}
+
+function buildReplayDiffLines(originalMessage: string, currentMessage: string, maxLines = 80) {
+  const originalLines = originalMessage.replace(/\r/g, "").split("\n");
+  const currentLines = currentMessage.replace(/\r/g, "").split("\n");
+  const previewLines: ReplayDiffLine[] = [];
+  let originalIndex = 0;
+  let currentIndex = 0;
+
+  while (
+    (originalIndex < originalLines.length || currentIndex < currentLines.length) &&
+    previewLines.length < maxLines
+  ) {
+    const originalLine = originalIndex < originalLines.length ? originalLines[originalIndex] : null;
+    const currentLine = currentIndex < currentLines.length ? currentLines[currentIndex] : null;
+
+    if (originalLine !== null && currentLine !== null && originalLine === currentLine) {
+      previewLines.push({ kind: "same", text: originalLine });
+      originalIndex += 1;
+      currentIndex += 1;
+      continue;
+    }
+
+    if (originalLine !== null) {
+      previewLines.push({ kind: "removed", text: originalLine });
+      originalIndex += 1;
+    }
+    if (currentLine !== null && previewLines.length < maxLines) {
+      previewLines.push({ kind: "added", text: currentLine });
+      currentIndex += 1;
+    }
+  }
+
+  if (originalIndex < originalLines.length || currentIndex < currentLines.length) {
+    previewLines.push({ kind: "truncated", text: `仅展示前 ${maxLines} 行差异` });
+  }
+
+  return previewLines;
 }
 
 type StreamPayload = Record<string, unknown>;
@@ -407,6 +451,21 @@ export function ToolUiChatWorkbench() {
   );
 
   const actionTodos = useMemo(() => buildActionTodos(actionResult), [actionResult]);
+
+  const replayDiffPreview = useMemo(() => {
+    if (!replayDraft) {
+      return {
+        isEdited: false,
+        lengthDelta: 0,
+        lines: [] as ReplayDiffLine[],
+      };
+    }
+    return {
+      isEdited: replayDraft.message !== replayDraft.originalMessage,
+      lengthDelta: replayDraft.message.length - replayDraft.originalMessage.length,
+      lines: buildReplayDiffLines(replayDraft.originalMessage, replayDraft.message),
+    };
+  }, [replayDraft]);
 
   const olderActionHistory = useMemo(
     () =>
@@ -903,6 +962,7 @@ export function ToolUiChatWorkbench() {
       setReplayDraft({
         sourceLabel: `${action.plannedAction.toUpperCase()} · ${action.executorName ?? "未命名动作"}`,
         action,
+        originalMessage: replayMessage,
         message: replayMessage,
       });
     },
@@ -1326,6 +1386,56 @@ export function ToolUiChatWorkbench() {
               placeholder="编辑后再发送重放消息"
               disabled={isSending}
             />
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium">差异预览（原始 → 当前）</p>
+                <span
+                  className={cn(
+                    "text-[11px]",
+                    replayDiffPreview.isEdited ? "text-amber-700" : "text-muted-foreground",
+                  )}
+                >
+                  {replayDiffPreview.isEdited
+                    ? `已修改（长度变化 ${
+                        replayDiffPreview.lengthDelta >= 0
+                          ? `+${replayDiffPreview.lengthDelta}`
+                          : replayDiffPreview.lengthDelta
+                      }）`
+                    : "未修改"}
+                </span>
+              </div>
+              {replayDiffPreview.isEdited ? (
+                <div className="max-h-44 space-y-0.5 overflow-y-auto rounded-md border bg-background px-2 py-1 font-mono text-[11px] leading-5">
+                  {replayDiffPreview.lines.map((line, index) => {
+                    if (line.kind === "truncated") {
+                      return (
+                        <p key={`${line.kind}-${index}`} className="text-muted-foreground italic">
+                          … {line.text}
+                        </p>
+                      );
+                    }
+
+                    const marker = line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " ";
+                    const lineClassName =
+                      line.kind === "added"
+                        ? "text-emerald-700"
+                        : line.kind === "removed"
+                          ? "text-destructive"
+                          : "text-muted-foreground";
+                    return (
+                      <p key={`${line.kind}-${index}`} className={lineClassName}>
+                        <span className="inline-block w-4">{marker}</span>
+                        {line.text || " "}
+                      </p>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-[11px]">
+                  当前内容与原始重放消息一致，无需确认额外改动。
+                </p>
+              )}
+            </div>
             <div className="text-muted-foreground text-[11px]">
               快捷键：Ctrl/Cmd + Enter 发送，Esc 关闭弹窗。
             </div>
