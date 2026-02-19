@@ -127,6 +127,16 @@ npm run issue26:prepare -- \
 - `ISSUE-26-COMMENT.md`
 - `ISSUE-26-CLOSE-COMMANDS.sh`
 
+生成最终 3 步关单清单：
+
+```bash
+npm run issue26:finalize -- \
+  --report-dir "./artifacts/loadtest-scenarios"
+```
+
+会额外生成：
+- `ISSUE-26-FINAL-STEPS.md`
+
 压测结果可按模板沉淀：`docs/PERF_REPORT_TEMPLATE.md`
 完整执行清单见：`docs/LOADTEST_EXECUTION_CHECKLIST.md`
 

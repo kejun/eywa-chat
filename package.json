@@ -21,7 +21,8 @@
     "loadtest:chat:report": "node scripts/loadtest-chat-and-report.mjs",
     "loadtest:chat:report:autojwt": "node scripts/loadtest-chat-report-with-jwt.mjs",
     "loadtest:scenarios": "node scripts/loadtest-scenarios.mjs",
-    "issue26:prepare": "node scripts/prepare-issue26-closure.mjs"
+    "issue26:prepare": "node scripts/prepare-issue26-closure.mjs",
+    "issue26:finalize": "node scripts/issue26-finalize.mjs"
   },
   "repository": {
     "type": "git",

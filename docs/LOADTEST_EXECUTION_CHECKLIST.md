@@ -60,6 +60,13 @@ npm run issue26:prepare -- \
   --report-dir "./artifacts/loadtest-scenarios"
 ```
 
+生成最终 3 步关单清单：
+
+```bash
+npm run issue26:finalize -- \
+  --report-dir "./artifacts/loadtest-scenarios"
+```
+
 ---
 
 ## 5. 人工复核项
@@ -75,9 +82,11 @@ npm run issue26:prepare -- \
 
 1. 先在 issue #26 贴上：
    - `ISSUE-26-CLOSURE.md` 内容（优先）
+   - `ISSUE-26-COMMENT.md`（可直接粘贴）
    - `OVERVIEW.md` 结论（补充）
    - 各场景 markdown 报告路径
-2. 若全部 PASS，关闭：
+2. 参考 `ISSUE-26-FINAL-STEPS.md` 执行命令。
+3. 若全部 PASS，关闭：
    - `#26`
    - Epic `#7`
 
