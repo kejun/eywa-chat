@@ -13,11 +13,17 @@ import {
   OptionList,
   type OptionListSelection,
 } from "@/components/tool-ui/option-list";
+import {
+  MessageDraft,
+  type SerializableEmailDraft,
+} from "@/components/tool-ui/message-draft";
 import { Plan, type PlanTodo, type PlanTodoStatus } from "@/components/tool-ui/plan";
+import { Terminal, type SerializableTerminal } from "@/components/tool-ui/terminal";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Loader2,
+  MailPlus,
   RotateCcw,
   SendHorizontal,
   ShieldAlert,
@@ -36,6 +42,10 @@ type ChatMessage = {
   retrievedCount?: number;
   persistedCount?: number;
   degraded?: boolean;
+};
+
+type TerminalSession = SerializableTerminal & {
+  traceId?: string;
 };
 
 const THREAD_STORAGE_KEY = "eywa.chat.threadId";
@@ -84,6 +94,24 @@ function createThreadId() {
 
 function createMessageId(prefix: MessageRole) {
   return `${prefix}-${Date.now().toString(36)}-${createShortId()}`;
+}
+
+function toSingleLine(text: string, maxLength: number) {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLength) {
+    return compact;
+  }
+  return `${compact.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+function buildDraftSubject(content: string) {
+  const primary = content
+    .split(/\n|。|！|!|？|\?/)[0]
+    ?.trim();
+  if (!primary) {
+    return "对话回复草稿";
+  }
+  return `回复草稿：${toSingleLine(primary, 36)}`;
 }
 
 type StreamPayload = Record<string, unknown>;
@@ -235,9 +263,12 @@ export function ToolUiChatWorkbench() {
   const [traceId, setTraceId] = useState<string | null>(null);
   const [retrievedCount, setRetrievedCount] = useState<number | null>(null);
   const [persistedCount, setPersistedCount] = useState<number | null>(null);
+  const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
+  const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
+  const [emailDraft, setEmailDraft] = useState<SerializableEmailDraft | null>(null);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const activeAssistantIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const messagePanelRef = useRef<HTMLDivElement>(null);
 
@@ -263,6 +294,15 @@ export function ToolUiChatWorkbench() {
     [errorText, persistedCount, phase, retrievedCount, traceId],
   );
 
+  const latestAssistantMessage = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find((message) => message.role === "assistant" && message.content.trim().length > 0) ??
+      null,
+    [messages],
+  );
+
   useEffect(() => {
     const existing = window.localStorage.getItem(THREAD_STORAGE_KEY);
     const nextId = existing && existing.trim() ? existing : createThreadId();
@@ -280,12 +320,17 @@ export function ToolUiChatWorkbench() {
 
   const refreshThread = useCallback(() => {
     const nextId = createThreadId();
+    abortRef.current?.abort();
     setThreadId(nextId);
     setMessages([]);
     setPhase("idle");
     setTraceId(null);
     setRetrievedCount(null);
     setPersistedCount(null);
+    setActiveTerminal(null);
+    setTerminalHistory([]);
+    setEmailDraft(null);
+    setDraftNotice(null);
     setErrorText(null);
     setSelectedStarter(null);
     window.localStorage.setItem(THREAD_STORAGE_KEY, nextId);
@@ -323,7 +368,50 @@ export function ToolUiChatWorkbench() {
 
       const userMessageId = createMessageId("user");
       const assistantMessageId = createMessageId("assistant");
-      activeAssistantIdRef.current = assistantMessageId;
+      const terminalId = `terminal-${Date.now().toString(36)}-${createShortId()}`;
+      const requestStartedAt = Date.now();
+      let tokenChunkCount = 0;
+      let terminalFinalized = false;
+
+      const appendTerminalLine = (line: string) => {
+        setActiveTerminal((current) => {
+          if (!current || current.id !== terminalId) {
+            return current;
+          }
+          return {
+            ...current,
+            stdout: current.stdout ? `${current.stdout}\n${line}` : line,
+          };
+        });
+      };
+
+      const finalizeTerminal = (params: {
+        exitCode: number;
+        stderr?: string;
+        traceId?: string;
+      }) => {
+        if (terminalFinalized) {
+          return;
+        }
+        terminalFinalized = true;
+
+        const durationMs = Date.now() - requestStartedAt;
+        setActiveTerminal((current) => {
+          if (!current || current.id !== terminalId) {
+            return current;
+          }
+
+          const completedSession: TerminalSession = {
+            ...current,
+            exitCode: params.exitCode,
+            stderr: params.stderr,
+            traceId: params.traceId ?? current.traceId,
+            durationMs,
+          };
+          setTerminalHistory((history) => [completedSession, ...history].slice(0, 6));
+          return null;
+        });
+      };
 
       setMessages((previous) => [
         ...previous,
@@ -336,8 +424,20 @@ export function ToolUiChatWorkbench() {
       setTraceId(null);
       setRetrievedCount(null);
       setPersistedCount(null);
+      setDraftNotice(null);
       setPhase("requesting");
       setIsSending(true);
+      setActiveTerminal({
+        id: terminalId,
+        command: `POST /api/chat --thread ${threadId}`,
+        stdout: [
+          `[request] ${new Date(requestStartedAt).toISOString()}`,
+          `[input] ${toSingleLine(messageText, 120)}`,
+        ].join("\n"),
+        exitCode: 0,
+        cwd: "/api/chat",
+        maxCollapsedLines: 10,
+      });
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -349,9 +449,13 @@ export function ToolUiChatWorkbench() {
 
         if (token) {
           headers.set("authorization", `Bearer ${token}`);
+          appendTerminalLine("[auth] bearer token");
         } else {
           headers.set("x-tenant-id", resolvedTenantId);
           headers.set("x-user-id", resolvedUserId);
+          appendTerminalLine(
+            `[auth] header mode tenant=${resolvedTenantId} user=${resolvedUserId}`,
+          );
         }
 
         const response = await fetch("/api/chat", {
@@ -363,6 +467,7 @@ export function ToolUiChatWorkbench() {
           }),
           signal: controller.signal,
         });
+        appendTerminalLine(`[http] status ${response.status}`);
 
         if (!response.ok) {
           const bodyText = await response.text();
@@ -392,18 +497,29 @@ export function ToolUiChatWorkbench() {
                 : null;
             if (nextTraceId) {
               setTraceId(nextTraceId);
+              setActiveTerminal((current) => {
+                if (!current || current.id !== terminalId) {
+                  return current;
+                }
+                return { ...current, traceId: nextTraceId };
+              });
+              appendTerminalLine(`[meta] traceId=${nextTraceId}`);
             }
             return;
           }
 
           if (event === "token") {
             setPhase("streaming");
+            tokenChunkCount += 1;
             const tokenText = typeof payload.text === "string" ? payload.text : "";
             if (tokenText) {
               updateAssistantMessage(assistantMessageId, (message) => ({
                 ...message,
                 content: message.content + tokenText,
               }));
+              if (tokenChunkCount === 1 || tokenChunkCount % 20 === 0) {
+                appendTerminalLine(`[token] chunks=${tokenChunkCount}`);
+              }
             }
             return;
           }
@@ -441,6 +557,13 @@ export function ToolUiChatWorkbench() {
               setErrorText("模型已降级处理，本轮回复可用但建议稍后重试。");
             }
 
+            appendTerminalLine(
+              `[done] retrieved=${doneRetrievedCount ?? 0} persisted=${donePersistedCount ?? 0} degraded=${degraded}`,
+            );
+            finalizeTerminal({
+              exitCode: 0,
+              traceId: doneTraceId,
+            });
             setPhase("completed");
           }
         });
@@ -450,22 +573,35 @@ export function ToolUiChatWorkbench() {
 
         if (controller.signal.aborted) {
           setErrorText("本轮生成已停止。");
+          appendTerminalLine("[abort] generation cancelled by user");
           updateAssistantMessage(assistantMessageId, (chatMessage) => ({
             ...chatMessage,
             content: chatMessage.content || "（已手动停止本轮生成）",
           }));
+          finalizeTerminal({
+            exitCode: 130,
+            stderr: "aborted by user",
+          });
         } else {
           setErrorText(message);
+          appendTerminalLine(`[error] ${message}`);
           updateAssistantMessage(assistantMessageId, (chatMessage) => ({
             ...chatMessage,
             content: chatMessage.content || `请求失败：${message}`,
           }));
+          finalizeTerminal({
+            exitCode: 1,
+            stderr: message,
+          });
         }
 
         setPhase("failed");
       } finally {
         abortRef.current = null;
-        activeAssistantIdRef.current = null;
+        if (!terminalFinalized) {
+          appendTerminalLine("[finalize] stream closed");
+          finalizeTerminal({ exitCode: 0 });
+        }
         setIsSending(false);
       }
     },
@@ -533,6 +669,50 @@ export function ToolUiChatWorkbench() {
     [isSending],
   );
 
+  const handleCreateDraftFromLatest = useCallback(() => {
+    if (!latestAssistantMessage) {
+      return;
+    }
+
+    const recipientIdentity = userId.trim() || "user";
+    const draft: SerializableEmailDraft = {
+      id: `draft-${Date.now().toString(36)}-${createShortId()}`,
+      channel: "email",
+      subject: buildDraftSubject(latestAssistantMessage.content),
+      from: "assistant@eywa.local",
+      to: [`${recipientIdentity}@example.com`],
+      body: latestAssistantMessage.content,
+    };
+    setEmailDraft(draft);
+    setDraftNotice("已从最近一条 assistant 回复生成邮件草稿。");
+  }, [latestAssistantMessage, userId]);
+
+  const handleDraftSend = useCallback(() => {
+    setDraftNotice("邮件草稿已发送（模拟）。");
+    setMessages((previous) => [
+      ...previous,
+      {
+        id: createMessageId("assistant"),
+        role: "assistant",
+        content: "我已根据草稿发送邮件（模拟执行）。",
+      },
+    ]);
+  }, []);
+
+  const handleDraftUndo = useCallback(() => {
+    setDraftNotice("已撤销发送，草稿恢复为可编辑状态。");
+  }, []);
+
+  const handleDraftCancel = useCallback(() => {
+    setEmailDraft(null);
+    setDraftNotice("已关闭邮件草稿。");
+  }, []);
+
+  const handleClearTerminalHistory = useCallback(() => {
+    setActiveTerminal(null);
+    setTerminalHistory([]);
+  }, []);
+
   const composerDisabled = isSending || input.trim().length === 0;
   const jwtMode = jwtToken.trim().length > 0;
 
@@ -541,7 +721,7 @@ export function ToolUiChatWorkbench() {
       <header className="rounded-xl border bg-card p-4">
         <h1 className="text-xl font-semibold">Eywa Chat · Tool UI 工作台</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          基于 Tool UI（OptionList + Plan）构建，接入 /api/chat 的流式 SSE 响应。
+          基于 Tool UI（OptionList + Plan + Terminal + MessageDraft）构建，接入 /api/chat 的流式 SSE 响应。
         </p>
       </header>
 
@@ -612,6 +792,35 @@ export function ToolUiChatWorkbench() {
               ]}
             />
           </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium">请求诊断（Tool UI Terminal）</h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClearTerminalHistory}
+                disabled={!activeTerminal && terminalHistory.length === 0}
+              >
+                清空
+              </Button>
+            </div>
+
+            {activeTerminal ? (
+              <Terminal {...activeTerminal} expanded />
+            ) : terminalHistory.length > 0 ? (
+              <div className="space-y-2">
+                {terminalHistory.map((session) => (
+                  <Terminal key={session.id} {...session} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-muted-foreground rounded-lg border border-dashed p-3 text-xs">
+                发送消息后，这里会显示 /api/chat 的请求与流式回包日志。
+              </div>
+            )}
+          </div>
         </aside>
 
         <main className="flex min-h-[72vh] flex-col rounded-xl border bg-card p-4">
@@ -679,6 +888,41 @@ export function ToolUiChatWorkbench() {
               {errorText}
             </div>
           )}
+
+          <div className="mt-4 space-y-2 border-t pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-muted-foreground text-xs">
+                {latestAssistantMessage
+                  ? "可将最近一条 assistant 回复转成邮件草稿。"
+                  : "先让 assistant 生成一条回复，再创建草稿。"}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCreateDraftFromLatest}
+                disabled={!latestAssistantMessage}
+              >
+                <MailPlus className="size-4" />
+                生成邮件草稿
+              </Button>
+            </div>
+
+            {draftNotice && (
+              <div className="text-muted-foreground rounded-md border bg-muted/40 px-3 py-2 text-xs">
+                {draftNotice}
+              </div>
+            )}
+
+            {emailDraft ? (
+              <MessageDraft
+                {...emailDraft}
+                onSend={handleDraftSend}
+                onUndo={handleDraftUndo}
+                onCancel={handleDraftCancel}
+              />
+            ) : null}
+          </div>
 
           <form onSubmit={handleSubmit} className="mt-4 space-y-3 border-t pt-4">
             <textarea
