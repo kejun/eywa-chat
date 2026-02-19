@@ -56,6 +56,11 @@ type TerminalSession = SerializableTerminal & {
   traceId?: string;
 };
 
+type ActionHistoryEntry = {
+  id: string;
+  action: ActionDonePayload;
+};
+
 const THREAD_STORAGE_KEY = "eywa.chat.threadId";
 
 const STARTER_PROMPTS = [
@@ -261,6 +266,62 @@ function buildPlanTodos(params: {
   ];
 }
 
+function renderActionSurfaceCard(params: {
+  action: ActionDonePayload;
+  scope: string;
+  userId: string;
+}) {
+  const surface = buildActionSurface(params.action, params.userId);
+  if (!surface) {
+    return null;
+  }
+
+  if (surface.kind === "preference") {
+    return (
+      <OptionList
+        id={buildActionCardId(params.action, `${params.scope}-preference-option`)}
+        options={[
+          {
+            id: "selected",
+            label: surface.optionLabel,
+            description: surface.description,
+          },
+        ]}
+        selectionMode="single"
+        choice="selected"
+      />
+    );
+  }
+
+  if (surface.kind === "task") {
+    return (
+      <Plan
+        id={buildActionCardId(params.action, `${params.scope}-task-plan`)}
+        title="任务捕获结果"
+        description={surface.description ?? "已写入任务记忆"}
+        todos={[
+          {
+            id: "task-captured",
+            label: surface.taskTitle,
+            status: "completed",
+          },
+        ]}
+        maxVisibleTodos={1}
+      />
+    );
+  }
+
+  if (surface.kind === "echo") {
+    return <MessageDraft {...surface.draft} />;
+  }
+
+  if (surface.kind === "time" || surface.kind === "generic") {
+    return <Terminal {...surface.terminal} />;
+  }
+
+  return null;
+}
+
 export function ToolUiChatWorkbench() {
   const [threadId, setThreadId] = useState("");
   const [jwtToken, setJwtToken] = useState("");
@@ -274,6 +335,8 @@ export function ToolUiChatWorkbench() {
   const [retrievedCount, setRetrievedCount] = useState<number | null>(null);
   const [persistedCount, setPersistedCount] = useState<number | null>(null);
   const [actionResult, setActionResult] = useState<ActionDonePayload | null>(null);
+  const [actionResultEntryId, setActionResultEntryId] = useState<string | null>(null);
+  const [actionHistory, setActionHistory] = useState<ActionHistoryEntry[]>([]);
   const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
   const [emailDraft, setEmailDraft] = useState<SerializableEmailDraft | null>(null);
@@ -316,9 +379,12 @@ export function ToolUiChatWorkbench() {
 
   const actionTodos = useMemo(() => buildActionTodos(actionResult), [actionResult]);
 
-  const actionSurface = useMemo(
-    () => buildActionSurface(actionResult, userId),
-    [actionResult, userId],
+  const olderActionHistory = useMemo(
+    () =>
+      actionHistory
+        .filter((entry) => entry.id !== actionResultEntryId)
+        .slice(0, 4),
+    [actionHistory, actionResultEntryId],
   );
 
   useEffect(() => {
@@ -346,6 +412,8 @@ export function ToolUiChatWorkbench() {
     setRetrievedCount(null);
     setPersistedCount(null);
     setActionResult(null);
+    setActionResultEntryId(null);
+    setActionHistory([]);
     setActiveTerminal(null);
     setTerminalHistory([]);
     setEmailDraft(null);
@@ -444,6 +512,7 @@ export function ToolUiChatWorkbench() {
       setRetrievedCount(null);
       setPersistedCount(null);
       setActionResult(null);
+      setActionResultEntryId(null);
       setDraftNotice(null);
       setPhase("requesting");
       setIsSending(true);
@@ -565,7 +634,17 @@ export function ToolUiChatWorkbench() {
             if (typeof donePersistedCount === "number") {
               setPersistedCount(donePersistedCount);
             }
-            setActionResult(parsedAction);
+            if (parsedAction) {
+              const actionEntryId = `action-${Date.now().toString(36)}-${createShortId()}`;
+              setActionResult(parsedAction);
+              setActionResultEntryId(actionEntryId);
+              setActionHistory((previous) =>
+                [{ id: actionEntryId, action: parsedAction }, ...previous].slice(0, 10),
+              );
+            } else {
+              setActionResult(null);
+              setActionResultEntryId(null);
+            }
 
             updateAssistantMessage(assistantMessageId, (message) => ({
               ...message,
@@ -774,41 +853,37 @@ export function ToolUiChatWorkbench() {
               }
               todos={actionTodos}
             />
-            {actionSurface?.kind === "preference" && actionResult ? (
-              <OptionList
-                id={buildActionCardId(actionResult, "action-preference-option")}
-                options={[
-                  {
-                    id: "selected",
-                    label: actionSurface.optionLabel,
-                    description: actionSurface.description,
-                  },
-                ]}
-                selectionMode="single"
-                choice="selected"
-              />
-            ) : null}
-            {actionSurface?.kind === "task" && actionResult ? (
-              <Plan
-                id={buildActionCardId(actionResult, "action-task-plan")}
-                title="任务捕获结果"
-                description={actionSurface.description ?? "已写入任务记忆"}
-                todos={[
-                  {
-                    id: "task-captured",
-                    label: actionSurface.taskTitle,
-                    status: "completed",
-                  },
-                ]}
-                maxVisibleTodos={1}
-              />
-            ) : null}
-            {actionSurface?.kind === "echo" ? <MessageDraft {...actionSurface.draft} /> : null}
-            {actionSurface?.kind === "time" ? (
-              <Terminal {...actionSurface.terminal} />
-            ) : null}
-            {actionSurface?.kind === "generic" ? (
-              <Terminal {...actionSurface.terminal} />
+            {actionResult
+              ? renderActionSurfaceCard({
+                  action: actionResult,
+                  scope: "action-current",
+                  userId,
+                })
+              : null}
+            {olderActionHistory.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs">最近动作历史</p>
+                {olderActionHistory.map((entry) => (
+                  <div key={entry.id} className="space-y-2 rounded-lg border border-dashed p-2">
+                    <p className="text-muted-foreground text-[11px]">
+                      {entry.action.plannedAction.toUpperCase()} ·{" "}
+                      {entry.action.executorName ?? "未命名动作"}
+                    </p>
+                    <Plan
+                      id={`${entry.id}-summary-plan`}
+                      title="历史动作摘要"
+                      description={entry.action.summary ?? "无摘要"}
+                      todos={buildActionTodos(entry.action)}
+                      maxVisibleTodos={3}
+                    />
+                    {renderActionSurfaceCard({
+                      action: entry.action,
+                      scope: entry.id,
+                      userId,
+                    })}
+                  </div>
+                ))}
+              </div>
             ) : null}
           </div>
 
