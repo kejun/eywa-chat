@@ -151,11 +151,13 @@ const executeSkillNode = async (state: ChatState) => {
 
     return {
       actionSummary: result.summary,
+      actionOutput: asObject(result.output),
       actionMemoryCandidates: result.memoryCandidates ?? [],
       actionValidationError: result.status === "failed" ? result.summary : "",
     };
   } catch (error) {
     return {
+      actionOutput: {},
       actionValidationError:
         error instanceof Error ? error.message : "技能执行失败，请稍后重试。",
     };
@@ -200,11 +202,13 @@ const executeMcpToolNode = async (state: ChatState) => {
 
     return {
       actionSummary: result.summary,
+      actionOutput: asObject(result.output),
       actionMemoryCandidates: result.memoryCandidates ?? [],
       actionValidationError: result.status === "failed" ? result.summary : "",
     };
   } catch (error) {
     return {
+      actionOutput: {},
       actionValidationError:
         error instanceof Error ? error.message : "MCP 工具执行失败，请稍后重试。",
     };

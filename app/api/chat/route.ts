@@ -46,6 +46,9 @@ function buildActionDonePayload(state: Awaited<ReturnType<typeof runChatGraph>>)
   const summary = state.actionSummary || undefined;
   const error = state.actionValidationError || undefined;
   const memoryCandidateCount = state.actionMemoryCandidates.length;
+  const output = isPlainObject(state.actionOutput) && Object.keys(state.actionOutput).length > 0
+    ? state.actionOutput
+    : undefined;
 
   let executorName: string | undefined;
   let args: Record<string, unknown> | undefined;
@@ -68,7 +71,8 @@ function buildActionDonePayload(state: Awaited<ReturnType<typeof runChatGraph>>)
     !error &&
     memoryCandidateCount === 0 &&
     !executorName &&
-    !args
+    !args &&
+    !output
   ) {
     return null;
   }
@@ -79,6 +83,7 @@ function buildActionDonePayload(state: Awaited<ReturnType<typeof runChatGraph>>)
     summary,
     error,
     args,
+    output,
     memoryCandidateCount,
   };
 }

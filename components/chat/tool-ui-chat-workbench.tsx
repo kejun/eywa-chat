@@ -54,8 +54,33 @@ type ActionDonePayload = {
   summary?: string;
   error?: string;
   args?: Record<string, unknown>;
+  output?: Record<string, unknown>;
   memoryCandidateCount?: number;
 };
+
+type ActionSurface =
+  | {
+      kind: "preference";
+      optionLabel: string;
+      description?: string;
+    }
+  | {
+      kind: "task";
+      taskTitle: string;
+      description?: string;
+    }
+  | {
+      kind: "echo";
+      draft: SerializableEmailDraft;
+    }
+  | {
+      kind: "time";
+      terminal: SerializableTerminal;
+    }
+  | {
+      kind: "generic";
+      terminal: SerializableTerminal;
+    };
 
 const THREAD_STORAGE_KEY = "eywa.chat.threadId";
 
@@ -146,6 +171,7 @@ function parseActionDonePayload(value: unknown): ActionDonePayload | null {
   const error =
     typeof value.error === "string" && value.error.trim() ? value.error.trim() : undefined;
   const args = isPlainObject(value.args) ? value.args : undefined;
+  const output = isPlainObject(value.output) ? value.output : undefined;
   const memoryCandidateCount =
     typeof value.memoryCandidateCount === "number" ? value.memoryCandidateCount : undefined;
 
@@ -155,8 +181,22 @@ function parseActionDonePayload(value: unknown): ActionDonePayload | null {
     summary,
     error,
     args,
+    output,
     memoryCandidateCount,
   };
+}
+
+function readStringField(record: Record<string, unknown> | undefined, key: string) {
+  const value = record?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function buildActionCardId(action: ActionDonePayload, suffix: string) {
+  const raw = [action.plannedAction, action.executorName ?? "", action.summary ?? "", suffix].join(
+    "-",
+  );
+  const compact = raw.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 64);
+  return `${suffix}-${compact || "action"}`;
 }
 
 function buildActionTodos(action: ActionDonePayload | null): PlanTodo[] {
@@ -247,6 +287,10 @@ function buildActionTerminal(action: ActionDonePayload): SerializableTerminal {
     action.args && Object.keys(action.args).length > 0
       ? JSON.stringify(action.args, null, 2)
       : "{}";
+  const outputBlock =
+    action.output && Object.keys(action.output).length > 0
+      ? JSON.stringify(action.output, null, 2)
+      : "{}";
 
   const stdoutLines = [
     `plannedAction: ${action.plannedAction}`,
@@ -256,16 +300,110 @@ function buildActionTerminal(action: ActionDonePayload): SerializableTerminal {
     "",
     "args:",
     argsBlock,
+    "",
+    "output:",
+    outputBlock,
   ];
 
   return {
-    id: `action-terminal-${Date.now().toString(36)}-${createShortId()}`,
+    id: buildActionCardId(action, "action-terminal"),
     command: `${action.plannedAction} ${action.executorName ?? "n/a"}`,
     cwd: "/action",
     stdout: stdoutLines.join("\n"),
     stderr: action.error,
     exitCode: action.error ? 1 : 0,
     maxCollapsedLines: 12,
+  };
+}
+
+function buildActionSurface(action: ActionDonePayload | null, userId: string): ActionSurface | null {
+  if (!action) {
+    return null;
+  }
+
+  if (action.error) {
+    return {
+      kind: "generic",
+      terminal: buildActionTerminal(action),
+    };
+  }
+
+  if (action.executorName === "save_preference") {
+    const preference =
+      readStringField(action.output, "preference") ??
+      readStringField(action.args, "preference") ??
+      action.summary;
+    if (preference) {
+      return {
+        kind: "preference",
+        optionLabel: preference,
+        description: action.summary,
+      };
+    }
+  }
+
+  if (action.executorName === "capture_task") {
+    const taskTitle =
+      readStringField(action.output, "task") ?? readStringField(action.args, "task") ?? action.summary;
+    if (taskTitle) {
+      return {
+        kind: "task",
+        taskTitle,
+        description: action.summary,
+      };
+    }
+  }
+
+  if (action.executorName === "echo_tool") {
+    const echoedText =
+      readStringField(action.output, "echoedText") ??
+      readStringField(action.args, "text") ??
+      action.summary;
+    if (echoedText) {
+      const recipientIdentity = userId.trim() || "user";
+      return {
+        kind: "echo",
+        draft: {
+          id: buildActionCardId(action, "action-echo-draft"),
+          channel: "email",
+          subject: `Echo 输出：${toSingleLine(echoedText, 32)}`,
+          from: "assistant@eywa.local",
+          to: [`${recipientIdentity}@example.com`],
+          body: echoedText,
+          outcome: "sent",
+        },
+      };
+    }
+  }
+
+  if (action.executorName === "current_time") {
+    const timezone =
+      readStringField(action.output, "timezone") ?? readStringField(action.args, "timezone");
+    const isoTime = readStringField(action.output, "isoTime");
+
+    const lines = [
+      `当前时间工具返回`,
+      `timezone: ${timezone ?? "n/a"}`,
+      `isoTime: ${isoTime ?? "n/a"}`,
+      `summary: ${action.summary ?? "n/a"}`,
+    ];
+
+    return {
+      kind: "time",
+      terminal: {
+        id: buildActionCardId(action, "action-time-terminal"),
+        command: "current_time",
+        cwd: "/mcp/current_time",
+        stdout: lines.join("\n"),
+        exitCode: 0,
+        maxCollapsedLines: 8,
+      },
+    };
+  }
+
+  return {
+    kind: "generic",
+    terminal: buildActionTerminal(action),
   };
 }
 
@@ -461,9 +599,9 @@ export function ToolUiChatWorkbench() {
 
   const actionTodos = useMemo(() => buildActionTodos(actionResult), [actionResult]);
 
-  const actionTerminal = useMemo(
-    () => (actionResult ? buildActionTerminal(actionResult) : null),
-    [actionResult],
+  const actionSurface = useMemo(
+    () => buildActionSurface(actionResult, userId),
+    [actionResult, userId],
   );
 
   useEffect(() => {
@@ -919,7 +1057,42 @@ export function ToolUiChatWorkbench() {
               }
               todos={actionTodos}
             />
-            {actionTerminal ? <Terminal {...actionTerminal} /> : null}
+            {actionSurface?.kind === "preference" && actionResult ? (
+              <OptionList
+                id={buildActionCardId(actionResult, "action-preference-option")}
+                options={[
+                  {
+                    id: "selected",
+                    label: actionSurface.optionLabel,
+                    description: actionSurface.description,
+                  },
+                ]}
+                selectionMode="single"
+                choice="selected"
+              />
+            ) : null}
+            {actionSurface?.kind === "task" && actionResult ? (
+              <Plan
+                id={buildActionCardId(actionResult, "action-task-plan")}
+                title="任务捕获结果"
+                description={actionSurface.description ?? "已写入任务记忆"}
+                todos={[
+                  {
+                    id: "task-captured",
+                    label: actionSurface.taskTitle,
+                    status: "completed",
+                  },
+                ]}
+                maxVisibleTodos={1}
+              />
+            ) : null}
+            {actionSurface?.kind === "echo" ? <MessageDraft {...actionSurface.draft} /> : null}
+            {actionSurface?.kind === "time" ? (
+              <Terminal {...actionSurface.terminal} />
+            ) : null}
+            {actionSurface?.kind === "generic" ? (
+              <Terminal {...actionSurface.terminal} />
+            ) : null}
           </div>
 
           <div className="rounded-xl border bg-card p-4">

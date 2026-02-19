@@ -31,6 +31,10 @@ export const ChatStateAnnotation = Annotation.Root({
     reducer: (_left, right) => right,
     default: () => "",
   }),
+  actionOutput: Annotation<Record<string, unknown>>({
+    reducer: (_left, right) => right,
+    default: () => ({}),
+  }),
   actionValidationError: Annotation<string>({
     reducer: (_left, right) => right,
     default: () => "",
