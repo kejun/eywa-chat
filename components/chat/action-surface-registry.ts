@@ -212,17 +212,27 @@ export function buildActionTodos(action: ActionDonePayload | null): PlanTodo[] {
   ];
 }
 
-type ActionSurfaceResolverContext = {
+export type ActionSurfaceResolverContext = {
   userId: string;
 };
 
-type ActionSurfaceResolver = (
+export type ActionSurfaceResolver = (
   action: ActionDonePayload,
   context: ActionSurfaceResolverContext,
 ) => ActionSurface | null;
 
-const actionSurfaceRegistry: Record<string, ActionSurfaceResolver> = {
-  save_preference: (action) => {
+const actionSurfaceRegistry = new Map<string, ActionSurfaceResolver>();
+
+export function registerActionSurfaceResolver(executorName: string, resolver: ActionSurfaceResolver) {
+  actionSurfaceRegistry.set(executorName, resolver);
+}
+
+export function getActionSurfaceResolver(executorName: string) {
+  return actionSurfaceRegistry.get(executorName);
+}
+
+function registerDefaultResolvers() {
+  registerActionSurfaceResolver("save_preference", (action) => {
     const preference =
       readStringField(action.output, "preference") ??
       readStringField(action.args, "preference") ??
@@ -235,8 +245,9 @@ const actionSurfaceRegistry: Record<string, ActionSurfaceResolver> = {
       optionLabel: preference,
       description: action.summary,
     };
-  },
-  capture_task: (action) => {
+  });
+
+  registerActionSurfaceResolver("capture_task", (action) => {
     const taskTitle =
       readStringField(action.output, "task") ?? readStringField(action.args, "task") ?? action.summary;
     if (!taskTitle) {
@@ -247,8 +258,9 @@ const actionSurfaceRegistry: Record<string, ActionSurfaceResolver> = {
       taskTitle,
       description: action.summary,
     };
-  },
-  echo_tool: (action, context) => {
+  });
+
+  registerActionSurfaceResolver("echo_tool", (action, context) => {
     const echoedText =
       readStringField(action.output, "echoedText") ??
       readStringField(action.args, "text") ??
@@ -269,8 +281,9 @@ const actionSurfaceRegistry: Record<string, ActionSurfaceResolver> = {
         outcome: "sent",
       },
     };
-  },
-  current_time: (action) => {
+  });
+
+  registerActionSurfaceResolver("current_time", (action) => {
     const timezone =
       readStringField(action.output, "timezone") ?? readStringField(action.args, "timezone");
     const isoTime = readStringField(action.output, "isoTime");
@@ -291,8 +304,10 @@ const actionSurfaceRegistry: Record<string, ActionSurfaceResolver> = {
         maxCollapsedLines: 8,
       },
     };
-  },
-};
+  });
+}
+
+registerDefaultResolvers();
 
 export function buildActionSurface(action: ActionDonePayload | null, userId: string): ActionSurface | null {
   if (!action) {
@@ -306,7 +321,7 @@ export function buildActionSurface(action: ActionDonePayload | null, userId: str
     };
   }
 
-  const resolver = action.executorName ? actionSurfaceRegistry[action.executorName] : undefined;
+  const resolver = action.executorName ? getActionSurfaceResolver(action.executorName) : undefined;
   const resolved = resolver?.(action, { userId });
   if (resolved) {
     return resolved;
