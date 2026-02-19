@@ -19,6 +19,7 @@ import {
 } from "@/components/tool-ui/message-draft";
 import { Plan, type PlanTodo, type PlanTodoStatus } from "@/components/tool-ui/plan";
 import { Terminal, type SerializableTerminal } from "@/components/tool-ui/terminal";
+import { ensureActionSurfaceResolversBootstrapped } from "@/components/chat/action-surface-bootstrap";
 import {
   type ActionDonePayload,
   buildActionCardId,
@@ -87,6 +88,8 @@ const STARTER_PROMPTS = [
 const STARTER_PROMPT_MAP: ReadonlyMap<string, string> = new Map(
   STARTER_PROMPTS.map((item) => [item.id, item.prompt]),
 );
+
+ensureActionSurfaceResolversBootstrapped();
 
 function createShortId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
