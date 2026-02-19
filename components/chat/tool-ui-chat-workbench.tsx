@@ -69,6 +69,12 @@ type ActionHistoryEntry = {
   action: ActionDonePayload;
 };
 
+type ReplayDraftState = {
+  sourceLabel: string;
+  action: ActionDonePayload;
+  message: string;
+};
+
 type ActionHistoryGroupKey = ActionDonePayload["plannedAction"];
 
 const ACTION_HISTORY_GROUPS: Array<{ key: ActionHistoryGroupKey; label: string }> = [
@@ -358,6 +364,7 @@ export function ToolUiChatWorkbench() {
     mcp: true,
     chat: false,
   });
+  const [replayDraft, setReplayDraft] = useState<ReplayDraftState | null>(null);
   const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
   const [emailDraft, setEmailDraft] = useState<SerializableEmailDraft | null>(null);
@@ -452,6 +459,7 @@ export function ToolUiChatWorkbench() {
       mcp: true,
       chat: false,
     });
+    setReplayDraft(null);
     setActiveTerminal(null);
     setTerminalHistory([]);
     setEmailDraft(null);
@@ -551,6 +559,7 @@ export function ToolUiChatWorkbench() {
       setPersistedCount(null);
       setActionResult(null);
       setActionResultEntryId(null);
+      setReplayDraft(null);
       setDraftNotice(null);
       setPhase("requesting");
       setIsSending(true);
@@ -871,11 +880,38 @@ export function ToolUiChatWorkbench() {
         return;
       }
 
-      setInput(replayMessage);
-      void sendMessage(replayMessage);
+      setReplayDraft({
+        sourceLabel: `${action.plannedAction.toUpperCase()} · ${action.executorName ?? "未命名动作"}`,
+        action,
+        message: replayMessage,
+      });
     },
-    [isSending, sendMessage],
+    [isSending],
   );
+
+  const handleReplayDraftMessageChange = useCallback((value: string) => {
+    setReplayDraft((previous) => (previous ? { ...previous, message: value } : previous));
+  }, []);
+
+  const handleCancelReplayDraft = useCallback(() => {
+    setReplayDraft(null);
+  }, []);
+
+  const handleConfirmReplayDraft = useCallback(() => {
+    if (!replayDraft) {
+      return;
+    }
+
+    const nextMessage = replayDraft.message.trim();
+    if (!nextMessage) {
+      setErrorText("重放消息不能为空。");
+      return;
+    }
+
+    setInput(nextMessage);
+    setReplayDraft(null);
+    void sendMessage(nextMessage);
+  }, [replayDraft, sendMessage]);
 
   const composerDisabled = isSending || input.trim().length === 0;
   const jwtMode = jwtToken.trim().length > 0;
@@ -971,7 +1007,7 @@ export function ToolUiChatWorkbench() {
                                   disabled={isSending || !replayMessage}
                                 >
                                   <Play className="size-3" />
-                                  重放
+                                  预览重放
                                 </Button>
                               </div>
                               <Plan
@@ -993,6 +1029,39 @@ export function ToolUiChatWorkbench() {
                     </Collapsible>
                   );
                 })}
+              </div>
+            ) : null}
+            {replayDraft ? (
+              <div className="space-y-2 rounded-lg border p-3">
+                <div>
+                  <p className="text-xs font-medium">重放预览（可编辑）</p>
+                  <p className="text-muted-foreground text-[11px]">
+                    来源：{replayDraft.sourceLabel}
+                    {replayDraft.action.sourceMessage
+                      ? ` · 原始消息：${toSingleLine(replayDraft.action.sourceMessage, 80)}`
+                      : ""}
+                  </p>
+                </div>
+                <textarea
+                  className="border-input bg-background min-h-20 w-full resize-y rounded-md border px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  value={replayDraft.message}
+                  onChange={(event) => handleReplayDraftMessageChange(event.target.value)}
+                  placeholder="编辑后再发送重放消息"
+                  disabled={isSending}
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <Button type="button" size="xs" variant="outline" onClick={handleCancelReplayDraft}>
+                    取消
+                  </Button>
+                  <Button
+                    type="button"
+                    size="xs"
+                    onClick={handleConfirmReplayDraft}
+                    disabled={isSending || replayDraft.message.trim().length === 0}
+                  >
+                    发送重放
+                  </Button>
+                </div>
               </div>
             ) : null}
           </div>
