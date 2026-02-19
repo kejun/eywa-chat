@@ -67,7 +67,6 @@ async function run() {
   const required = [closurePath, commentPath, commandsPath, overviewPath];
   const missing = [];
   for (const file of required) {
-    // eslint-disable-next-line no-await-in-loop
     if (!(await exists(file))) {
       missing.push(file);
     }
