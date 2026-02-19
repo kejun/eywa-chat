@@ -373,6 +373,7 @@ export function ToolUiChatWorkbench() {
   const [isSending, setIsSending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const messagePanelRef = useRef<HTMLDivElement>(null);
+  const replayDraftInputRef = useRef<HTMLTextAreaElement>(null);
 
   const starterOptions = useMemo(
     () =>
@@ -441,6 +442,25 @@ export function ToolUiChatWorkbench() {
     }
     panel.scrollTop = panel.scrollHeight;
   }, [isSending, messages]);
+
+  useEffect(() => {
+    if (!replayDraft) {
+      return;
+    }
+
+    replayDraftInputRef.current?.focus();
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setReplayDraft(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [replayDraft]);
 
   const refreshThread = useCallback(() => {
     const nextId = createThreadId();
@@ -913,6 +933,17 @@ export function ToolUiChatWorkbench() {
     void sendMessage(nextMessage);
   }, [replayDraft, sendMessage]);
 
+  const handleReplayDraftKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key !== "Enter" || (!event.ctrlKey && !event.metaKey)) {
+        return;
+      }
+      event.preventDefault();
+      handleConfirmReplayDraft();
+    },
+    [handleConfirmReplayDraft],
+  );
+
   const composerDisabled = isSending || input.trim().length === 0;
   const jwtMode = jwtToken.trim().length > 0;
 
@@ -1029,39 +1060,6 @@ export function ToolUiChatWorkbench() {
                     </Collapsible>
                   );
                 })}
-              </div>
-            ) : null}
-            {replayDraft ? (
-              <div className="space-y-2 rounded-lg border p-3">
-                <div>
-                  <p className="text-xs font-medium">重放预览（可编辑）</p>
-                  <p className="text-muted-foreground text-[11px]">
-                    来源：{replayDraft.sourceLabel}
-                    {replayDraft.action.sourceMessage
-                      ? ` · 原始消息：${toSingleLine(replayDraft.action.sourceMessage, 80)}`
-                      : ""}
-                  </p>
-                </div>
-                <textarea
-                  className="border-input bg-background min-h-20 w-full resize-y rounded-md border px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                  value={replayDraft.message}
-                  onChange={(event) => handleReplayDraftMessageChange(event.target.value)}
-                  placeholder="编辑后再发送重放消息"
-                  disabled={isSending}
-                />
-                <div className="flex items-center justify-end gap-2">
-                  <Button type="button" size="xs" variant="outline" onClick={handleCancelReplayDraft}>
-                    取消
-                  </Button>
-                  <Button
-                    type="button"
-                    size="xs"
-                    onClick={handleConfirmReplayDraft}
-                    disabled={isSending || replayDraft.message.trim().length === 0}
-                  >
-                    发送重放
-                  </Button>
-                </div>
               </div>
             ) : null}
           </div>
@@ -1296,6 +1294,56 @@ export function ToolUiChatWorkbench() {
           </form>
         </main>
       </div>
+      {replayDraft ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="replay-draft-dialog-title"
+          onClick={handleCancelReplayDraft}
+        >
+          <div
+            className="bg-background w-full max-w-2xl space-y-3 rounded-xl border p-4 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="space-y-1">
+              <h2 id="replay-draft-dialog-title" className="text-sm font-semibold">
+                重放预览（可编辑）
+              </h2>
+              <p className="text-muted-foreground text-xs">
+                来源：{replayDraft.sourceLabel}
+                {replayDraft.action.sourceMessage
+                  ? ` · 原始消息：${toSingleLine(replayDraft.action.sourceMessage, 80)}`
+                  : ""}
+              </p>
+            </div>
+            <textarea
+              ref={replayDraftInputRef}
+              className="border-input bg-background min-h-28 w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              value={replayDraft.message}
+              onChange={(event) => handleReplayDraftMessageChange(event.target.value)}
+              onKeyDown={handleReplayDraftKeyDown}
+              placeholder="编辑后再发送重放消息"
+              disabled={isSending}
+            />
+            <div className="text-muted-foreground text-[11px]">
+              快捷键：Ctrl/Cmd + Enter 发送，Esc 关闭弹窗。
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleCancelReplayDraft}>
+                取消
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmReplayDraft}
+                disabled={isSending || replayDraft.message.trim().length === 0}
+              >
+                发送重放
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
