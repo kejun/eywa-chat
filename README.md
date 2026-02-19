@@ -185,22 +185,37 @@ type ChatState = {
 
 ### 6.3 关键环境变量
 - `DASHSCOPE_API_KEY`
+- `DASHSCOPE_MODEL`
+- `DASHSCOPE_BASE_URL`
 - `SEEKDB_HOST`
 - `SEEKDB_PORT`
 - `SEEKDB_USER`
 - `SEEKDB_PASSWORD`
 - `SEEKDB_DATABASE`
+- `AUTH_JWT_SECRET`
+- `AUTH_TENANT_CLAIM`
+- `AUTH_USER_CLAIM`
+- `ALLOW_INSECURE_CONTEXT`（仅本地调试可设为 `1`）
 
 ---
 
 ## 7. Next.js 接口设计（最小可用）
 
 ### 7.1 `POST /api/chat`
+请求头（客户端需携带 JWT，服务端中间件会校验并注入身份头）：
+```text
+Authorization: Bearer <jwt-token>
+```
+
+中间件注入（内部）：
+```text
+x-tenant-id: <from-jwt-claim>
+x-user-id: <from-jwt-claim>
+```
+
 请求：
 ```json
 {
-  "tenantId": "t1",
-  "userId": "u1",
   "threadId": "th-001",
   "message": "我下周去上海出差，帮我记住我偏好高铁"
 }
@@ -211,7 +226,7 @@ type ChatState = {
 - 附带 `traceId` 便于排障
 
 ### 7.2 可选接口
-- `GET /api/memories?userId=...`：调试查看记忆
+- `GET /api/memories`：查看当前身份下记忆（身份来自 JWT）
 - `DELETE /api/memories/:id`：用户可控删除（合规要求）
 - `POST /api/memories/compact`：手动触发摘要压缩
 
@@ -323,11 +338,17 @@ export const dynamic = "force-dynamic";
 ### 13.4 环境变量与密钥
 - 在 Vercel Project Settings 中配置：
   - `DASHSCOPE_API_KEY`
+  - `DASHSCOPE_MODEL`
+  - `DASHSCOPE_BASE_URL`
   - `SEEKDB_HOST`
   - `SEEKDB_PORT`
   - `SEEKDB_USER`
   - `SEEKDB_PASSWORD`
   - `SEEKDB_DATABASE`
+  - `AUTH_JWT_SECRET`
+  - `AUTH_TENANT_CLAIM`
+  - `AUTH_USER_CLAIM`
+  - `ALLOW_INSECURE_CONTEXT`（生产环境必须为 `0`）
 - 区分 `Preview` / `Production` 两套变量，避免测试数据污染生产记忆。
 
 ### 13.5 流式响应与超时
@@ -440,3 +461,23 @@ Skill/MCP 执行后不应全量落库，建议仅沉淀“高价值结果”：
 详细的里程碑、Issue 清单、验收标准见：
 
 - `docs/IMPLEMENTATION_PLAN.md`
+
+---
+
+## 16. 上线运行手册
+
+Vercel 发布、Cron、观测与回滚说明见：
+
+- `docs/DEPLOYMENT_RUNBOOK.md`
+- `docs/PERF_REPORT_TEMPLATE.md`
+- `docs/ISSUE_PROGRESS.md`
+- `docs/LOADTEST_EXECUTION_CHECKLIST.md`
+
+常用辅助命令：
+
+- `npm run auth:jwt:generate -- --tenant-id t1 --user-id u1`
+- `npm run loadtest:chat:report -- --url <endpoint> --jwt-token <token>`
+- `npm run loadtest:chat:report:autojwt -- --url <endpoint> --tenant-id t1 --user-id u1`
+- `npm run loadtest:scenarios -- --url <endpoint> --tenant-id t1 --user-id u1`
+- `npm run issue26:prepare -- --report-dir ./artifacts/loadtest-scenarios`
+- `npm run issue26:finalize -- --report-dir ./artifacts/loadtest-scenarios`
