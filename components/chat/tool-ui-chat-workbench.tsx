@@ -67,7 +67,9 @@ const STARTER_PROMPTS = [
   },
 ] as const;
 
-const STARTER_PROMPT_MAP = new Map(STARTER_PROMPTS.map((item) => [item.id, item.prompt]));
+const STARTER_PROMPT_MAP: ReadonlyMap<string, string> = new Map(
+  STARTER_PROMPTS.map((item) => [item.id, item.prompt]),
+);
 
 function createShortId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
