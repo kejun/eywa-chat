@@ -50,6 +50,8 @@ npm run loadtest:scenarios -- \
 - [ ] `stress-summary.json` + `stress-report.md`
 - [ ] `OVERVIEW.md`（汇总与 PASS/FAIL 结论）
 - [ ] `ISSUE-26-CLOSURE.md`（关单草稿）
+- [ ] `ISSUE-26-COMMENT.md`（可直接粘贴 issue 评论）
+- [ ] `ISSUE-26-CLOSE-COMMANDS.sh`（关单命令脚本）
 
 生成关单草稿：
 

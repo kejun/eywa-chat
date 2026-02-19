@@ -116,6 +116,10 @@ async function run() {
 
   const absoluteDir = resolve(reportDir);
   const outPath = resolve(readArg("out", `${absoluteDir}/ISSUE-26-CLOSURE.md`));
+  const commentOutPath = resolve(readArg("comment-out", `${absoluteDir}/ISSUE-26-COMMENT.md`));
+  const commandsOutPath = resolve(
+    readArg("commands-out", `${absoluteDir}/ISSUE-26-CLOSE-COMMANDS.sh`),
+  );
   const scenarioRows = [];
   const missingArtifacts = [];
 
@@ -218,10 +222,40 @@ ${
 \`\`\`
 `;
 
+  const issueComment = `Loadtest execution finished.
+
+Overall: **${allPass ? "PASS" : "FAIL"}**
+Target: ${firstUrl}
+Generated: ${generatedAt}
+
+${buildResultTable(scenarioRows)}
+
+Artifacts:
+${artifactsList}
+${allPass ? "\nReady to close #26." : "\nKeep #26 open until thresholds are met."}
+`;
+
+  const closeCommands = `#!/usr/bin/env bash
+set -euo pipefail
+
+${
+  allPass
+    ? "# Close issue #26 and Epic #7\n" +
+      "gh issue close 26\n" +
+      "gh issue close 7\n"
+    : "# Not ready to close #26. Re-run loadtests after fixes.\n" +
+      "echo \"Not ready: thresholds not met.\" && exit 1\n"
+}
+`;
+
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, markdown, "utf8");
+  await writeFile(commentOutPath, issueComment, "utf8");
+  await writeFile(commandsOutPath, closeCommands, "utf8");
 
   console.log(`Issue #26 closure draft written to: ${outPath}`);
+  console.log(`Issue #26 comment template written to: ${commentOutPath}`);
+  console.log(`Issue #26 close commands written to: ${commandsOutPath}`);
   if (!allPass) {
     process.exitCode = 1;
   }
