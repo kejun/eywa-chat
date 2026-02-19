@@ -7,6 +7,7 @@ export type ActionDonePayload = {
   executorName?: string;
   summary?: string;
   error?: string;
+  sourceMessage?: string;
   args?: Record<string, unknown>;
   output?: Record<string, unknown>;
   memoryCandidateCount?: number;
@@ -61,6 +62,7 @@ function buildActionTerminal(action: ActionDonePayload): SerializableTerminal {
   const stdoutLines = [
     `plannedAction: ${action.plannedAction}`,
     `executor: ${action.executorName ?? "n/a"}`,
+    `sourceMessage: ${action.sourceMessage ?? "n/a"}`,
     `summary: ${action.summary ?? "n/a"}`,
     `memoryCandidateCount: ${action.memoryCandidateCount ?? 0}`,
     "",
@@ -100,6 +102,10 @@ export function parseActionDonePayload(value: unknown): ActionDonePayload | null
     typeof value.summary === "string" && value.summary.trim() ? value.summary.trim() : undefined;
   const error =
     typeof value.error === "string" && value.error.trim() ? value.error.trim() : undefined;
+  const sourceMessage =
+    typeof value.sourceMessage === "string" && value.sourceMessage.trim()
+      ? value.sourceMessage.trim()
+      : undefined;
   const args = isPlainObject(value.args) ? value.args : undefined;
   const output = isPlainObject(value.output) ? value.output : undefined;
   const memoryCandidateCount =
@@ -110,6 +116,7 @@ export function parseActionDonePayload(value: unknown): ActionDonePayload | null
     executorName,
     summary,
     error,
+    sourceMessage,
     args,
     output,
     memoryCandidateCount,
@@ -240,4 +247,32 @@ export function buildActionSurface(action: ActionDonePayload | null, userId: str
     kind: "generic",
     terminal: buildActionTerminal(action),
   };
+}
+
+export function buildActionReplayMessage(action: ActionDonePayload): string | null {
+  if (action.sourceMessage) {
+    return action.sourceMessage;
+  }
+
+  if (action.plannedAction === "mcp" && action.executorName) {
+    if (action.args && Object.keys(action.args).length > 0) {
+      return `/tool ${action.executorName} ${JSON.stringify(action.args)}`;
+    }
+    return `/tool ${action.executorName}`;
+  }
+
+  if (action.plannedAction === "skill") {
+    if (typeof action.args?.preference === "string" && action.args.preference.trim()) {
+      return `请记住：${action.args.preference.trim()}`;
+    }
+    if (typeof action.args?.task === "string" && action.args.task.trim()) {
+      return `请帮我记录任务：${action.args.task.trim()}`;
+    }
+  }
+
+  if (action.summary) {
+    return action.summary;
+  }
+
+  return null;
 }

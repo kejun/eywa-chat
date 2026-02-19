@@ -23,15 +23,23 @@ import { ensureActionSurfaceResolversBootstrapped } from "@/components/chat/acti
 import {
   type ActionDonePayload,
   buildActionCardId,
+  buildActionReplayMessage,
   buildActionSurface,
   buildActionTodos,
   parseActionDonePayload,
 } from "@/components/chat/action-surface-registry";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import {
+  ChevronDown,
   Loader2,
   MailPlus,
+  Play,
   RotateCcw,
   SendHorizontal,
   ShieldAlert,
@@ -60,6 +68,14 @@ type ActionHistoryEntry = {
   id: string;
   action: ActionDonePayload;
 };
+
+type ActionHistoryGroupKey = ActionDonePayload["plannedAction"];
+
+const ACTION_HISTORY_GROUPS: Array<{ key: ActionHistoryGroupKey; label: string }> = [
+  { key: "skill", label: "Skills" },
+  { key: "mcp", label: "MCP Tools" },
+  { key: "chat", label: "Chat 路径" },
+];
 
 const THREAD_STORAGE_KEY = "eywa.chat.threadId";
 
@@ -337,6 +353,11 @@ export function ToolUiChatWorkbench() {
   const [actionResult, setActionResult] = useState<ActionDonePayload | null>(null);
   const [actionResultEntryId, setActionResultEntryId] = useState<string | null>(null);
   const [actionHistory, setActionHistory] = useState<ActionHistoryEntry[]>([]);
+  const [historyGroupOpen, setHistoryGroupOpen] = useState<Record<ActionHistoryGroupKey, boolean>>({
+    skill: true,
+    mcp: true,
+    chat: false,
+  });
   const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
   const [emailDraft, setEmailDraft] = useState<SerializableEmailDraft | null>(null);
@@ -387,6 +408,18 @@ export function ToolUiChatWorkbench() {
     [actionHistory, actionResultEntryId],
   );
 
+  const groupedActionHistory = useMemo(() => {
+    const grouped: Record<ActionHistoryGroupKey, ActionHistoryEntry[]> = {
+      skill: [],
+      mcp: [],
+      chat: [],
+    };
+    for (const entry of olderActionHistory) {
+      grouped[entry.action.plannedAction].push(entry);
+    }
+    return grouped;
+  }, [olderActionHistory]);
+
   useEffect(() => {
     const existing = window.localStorage.getItem(THREAD_STORAGE_KEY);
     const nextId = existing && existing.trim() ? existing : createThreadId();
@@ -414,6 +447,11 @@ export function ToolUiChatWorkbench() {
     setActionResult(null);
     setActionResultEntryId(null);
     setActionHistory([]);
+    setHistoryGroupOpen({
+      skill: true,
+      mcp: true,
+      chat: false,
+    });
     setActiveTerminal(null);
     setTerminalHistory([]);
     setEmailDraft(null);
@@ -821,6 +859,24 @@ export function ToolUiChatWorkbench() {
     setTerminalHistory([]);
   }, []);
 
+  const handleReplayAction = useCallback(
+    (action: ActionDonePayload) => {
+      if (isSending) {
+        return;
+      }
+
+      const replayMessage = buildActionReplayMessage(action);
+      if (!replayMessage) {
+        setErrorText("该动作缺少可重放的输入信息。");
+        return;
+      }
+
+      setInput(replayMessage);
+      void sendMessage(replayMessage);
+    },
+    [isSending, sendMessage],
+  );
+
   const composerDisabled = isSending || input.trim().length === 0;
   const jwtMode = jwtToken.trim().length > 0;
 
@@ -863,26 +919,80 @@ export function ToolUiChatWorkbench() {
             {olderActionHistory.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-muted-foreground text-xs">最近动作历史</p>
-                {olderActionHistory.map((entry) => (
-                  <div key={entry.id} className="space-y-2 rounded-lg border border-dashed p-2">
-                    <p className="text-muted-foreground text-[11px]">
-                      {entry.action.plannedAction.toUpperCase()} ·{" "}
-                      {entry.action.executorName ?? "未命名动作"}
-                    </p>
-                    <Plan
-                      id={`${entry.id}-summary-plan`}
-                      title="历史动作摘要"
-                      description={entry.action.summary ?? "无摘要"}
-                      todos={buildActionTodos(entry.action)}
-                      maxVisibleTodos={3}
-                    />
-                    {renderActionSurfaceCard({
-                      action: entry.action,
-                      scope: entry.id,
-                      userId,
-                    })}
-                  </div>
-                ))}
+                {ACTION_HISTORY_GROUPS.map((group) => {
+                  const entries = groupedActionHistory[group.key];
+                  if (entries.length === 0) {
+                    return null;
+                  }
+
+                  const isOpen = historyGroupOpen[group.key];
+                  return (
+                    <Collapsible
+                      key={group.key}
+                      open={isOpen}
+                      onOpenChange={(open) =>
+                        setHistoryGroupOpen((previous) => ({
+                          ...previous,
+                          [group.key]: open,
+                        }))
+                      }
+                    >
+                      <CollapsibleTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs font-medium"
+                        >
+                          <span>
+                            {group.label} ({entries.length})
+                          </span>
+                          <ChevronDown
+                            className={cn("size-4 transition-transform", isOpen ? "rotate-180" : "")}
+                          />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-2 pt-2">
+                        {entries.map((entry) => {
+                          const replayMessage = buildActionReplayMessage(entry.action);
+                          return (
+                            <div
+                              key={entry.id}
+                              className="space-y-2 rounded-lg border border-dashed p-2"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-muted-foreground text-[11px]">
+                                  {entry.action.plannedAction.toUpperCase()} ·{" "}
+                                  {entry.action.executorName ?? "未命名动作"}
+                                </p>
+                                <Button
+                                  type="button"
+                                  size="xs"
+                                  variant="outline"
+                                  onClick={() => handleReplayAction(entry.action)}
+                                  disabled={isSending || !replayMessage}
+                                >
+                                  <Play className="size-3" />
+                                  重放
+                                </Button>
+                              </div>
+                              <Plan
+                                id={`${entry.id}-summary-plan`}
+                                title="历史动作摘要"
+                                description={entry.action.summary ?? "无摘要"}
+                                todos={buildActionTodos(entry.action)}
+                                maxVisibleTodos={3}
+                              />
+                              {renderActionSurfaceCard({
+                                action: entry.action,
+                                scope: entry.id,
+                                userId,
+                              })}
+                            </div>
+                          );
+                        })}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
               </div>
             ) : null}
           </div>
