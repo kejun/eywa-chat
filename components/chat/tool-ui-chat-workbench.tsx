@@ -48,6 +48,15 @@ type TerminalSession = SerializableTerminal & {
   traceId?: string;
 };
 
+type ActionDonePayload = {
+  plannedAction: "chat" | "skill" | "mcp";
+  executorName?: string;
+  summary?: string;
+  error?: string;
+  args?: Record<string, unknown>;
+  memoryCandidateCount?: number;
+};
+
 const THREAD_STORAGE_KEY = "eywa.chat.threadId";
 
 const STARTER_PROMPTS = [
@@ -112,6 +121,152 @@ function buildDraftSubject(content: string) {
     return "对话回复草稿";
   }
   return `回复草稿：${toSingleLine(primary, 36)}`;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseActionDonePayload(value: unknown): ActionDonePayload | null {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+
+  const plannedAction = value.plannedAction;
+  if (plannedAction !== "chat" && plannedAction !== "skill" && plannedAction !== "mcp") {
+    return null;
+  }
+
+  const executorName =
+    typeof value.executorName === "string" && value.executorName.trim()
+      ? value.executorName.trim()
+      : undefined;
+  const summary =
+    typeof value.summary === "string" && value.summary.trim() ? value.summary.trim() : undefined;
+  const error =
+    typeof value.error === "string" && value.error.trim() ? value.error.trim() : undefined;
+  const args = isPlainObject(value.args) ? value.args : undefined;
+  const memoryCandidateCount =
+    typeof value.memoryCandidateCount === "number" ? value.memoryCandidateCount : undefined;
+
+  return {
+    plannedAction,
+    executorName,
+    summary,
+    error,
+    args,
+    memoryCandidateCount,
+  };
+}
+
+function buildActionTodos(action: ActionDonePayload | null): PlanTodo[] {
+  if (!action) {
+    return [
+      {
+        id: "action-route",
+        label: "动作路由",
+        status: "pending",
+        description: "本轮对话未触发外部动作执行。",
+      },
+      {
+        id: "action-execute",
+        label: "动作执行",
+        status: "pending",
+        description: "等待 MCP/Skill 被触发。",
+      },
+      {
+        id: "action-validate",
+        label: "结果校验",
+        status: "pending",
+        description: "等待动作执行结果。",
+      },
+    ];
+  }
+
+  if (action.plannedAction === "chat") {
+    return [
+      {
+        id: "action-route",
+        label: "动作路由",
+        status: "completed",
+        description: "本轮判定为普通对话路径（未调用 MCP/Skill）。",
+      },
+      {
+        id: "action-execute",
+        label: "动作执行",
+        status: "cancelled",
+        description: "跳过外部动作，直接进入回复生成。",
+      },
+      {
+        id: "action-validate",
+        label: "结果校验",
+        status: "completed",
+        description: "普通对话路径无需动作结果校验。",
+      },
+    ];
+  }
+
+  const routeDescription = `${action.plannedAction === "skill" ? "Skill" : "MCP"}：${
+    action.executorName ?? "未命名动作"
+  }`;
+
+  const executeDescription = action.summary
+    ? action.summary
+    : action.error ?? "动作已执行，但未返回摘要。";
+
+  const validateDescription = action.error
+    ? `校验失败：${action.error}`
+    : typeof action.memoryCandidateCount === "number"
+      ? `校验通过，候选记忆 ${action.memoryCandidateCount} 条。`
+      : "校验通过。";
+
+  return [
+    {
+      id: "action-route",
+      label: "动作路由",
+      status: "completed",
+      description: routeDescription,
+    },
+    {
+      id: "action-execute",
+      label: "动作执行",
+      status: action.error ? "cancelled" : "completed",
+      description: executeDescription,
+    },
+    {
+      id: "action-validate",
+      label: "结果校验",
+      status: action.error ? "cancelled" : "completed",
+      description: validateDescription,
+    },
+  ];
+}
+
+function buildActionTerminal(action: ActionDonePayload): SerializableTerminal {
+  const argsBlock =
+    action.args && Object.keys(action.args).length > 0
+      ? JSON.stringify(action.args, null, 2)
+      : "{}";
+
+  const stdoutLines = [
+    `plannedAction: ${action.plannedAction}`,
+    `executor: ${action.executorName ?? "n/a"}`,
+    `summary: ${action.summary ?? "n/a"}`,
+    `memoryCandidateCount: ${action.memoryCandidateCount ?? 0}`,
+    "",
+    "args:",
+    argsBlock,
+  ];
+
+  return {
+    id: `action-terminal-${Date.now().toString(36)}-${createShortId()}`,
+    command: `${action.plannedAction} ${action.executorName ?? "n/a"}`,
+    cwd: "/action",
+    stdout: stdoutLines.join("\n"),
+    stderr: action.error,
+    exitCode: action.error ? 1 : 0,
+    maxCollapsedLines: 12,
+  };
 }
 
 type StreamPayload = Record<string, unknown>;
@@ -263,6 +418,7 @@ export function ToolUiChatWorkbench() {
   const [traceId, setTraceId] = useState<string | null>(null);
   const [retrievedCount, setRetrievedCount] = useState<number | null>(null);
   const [persistedCount, setPersistedCount] = useState<number | null>(null);
+  const [actionResult, setActionResult] = useState<ActionDonePayload | null>(null);
   const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
   const [emailDraft, setEmailDraft] = useState<SerializableEmailDraft | null>(null);
@@ -303,6 +459,13 @@ export function ToolUiChatWorkbench() {
     [messages],
   );
 
+  const actionTodos = useMemo(() => buildActionTodos(actionResult), [actionResult]);
+
+  const actionTerminal = useMemo(
+    () => (actionResult ? buildActionTerminal(actionResult) : null),
+    [actionResult],
+  );
+
   useEffect(() => {
     const existing = window.localStorage.getItem(THREAD_STORAGE_KEY);
     const nextId = existing && existing.trim() ? existing : createThreadId();
@@ -327,6 +490,7 @@ export function ToolUiChatWorkbench() {
     setTraceId(null);
     setRetrievedCount(null);
     setPersistedCount(null);
+    setActionResult(null);
     setActiveTerminal(null);
     setTerminalHistory([]);
     setEmailDraft(null);
@@ -424,6 +588,7 @@ export function ToolUiChatWorkbench() {
       setTraceId(null);
       setRetrievedCount(null);
       setPersistedCount(null);
+      setActionResult(null);
       setDraftNotice(null);
       setPhase("requesting");
       setIsSending(true);
@@ -534,6 +699,7 @@ export function ToolUiChatWorkbench() {
             const donePersistedCount =
               typeof payload.persistedCount === "number" ? payload.persistedCount : undefined;
             const degraded = payload.degraded === true;
+            const parsedAction = parseActionDonePayload(payload.action);
 
             if (doneTraceId) {
               setTraceId(doneTraceId);
@@ -544,6 +710,7 @@ export function ToolUiChatWorkbench() {
             if (typeof donePersistedCount === "number") {
               setPersistedCount(donePersistedCount);
             }
+            setActionResult(parsedAction);
 
             updateAssistantMessage(assistantMessageId, (message) => ({
               ...message,
@@ -560,6 +727,13 @@ export function ToolUiChatWorkbench() {
             appendTerminalLine(
               `[done] retrieved=${doneRetrievedCount ?? 0} persisted=${donePersistedCount ?? 0} degraded=${degraded}`,
             );
+            if (parsedAction) {
+              appendTerminalLine(
+                `[action] ${parsedAction.plannedAction}:${parsedAction.executorName ?? "n/a"} error=${parsedAction.error ? "yes" : "no"}`,
+              );
+            } else {
+              appendTerminalLine("[action] none");
+            }
             finalizeTerminal({
               exitCode: 0,
               traceId: doneTraceId,
@@ -733,6 +907,20 @@ export function ToolUiChatWorkbench() {
             description={threadId ? `Thread: ${threadId}` : "Thread 初始化中..."}
             todos={runtimeTodos}
           />
+
+          <div className="space-y-2">
+            <Plan
+              id="chat-action-plan"
+              title="动作执行卡片"
+              description={
+                actionResult
+                  ? `${actionResult.plannedAction.toUpperCase()} · ${actionResult.executorName ?? "未命名动作"}`
+                  : "尚未产生 MCP/Skill 动作结果"
+              }
+              todos={actionTodos}
+            />
+            {actionTerminal ? <Terminal {...actionTerminal} /> : null}
+          </div>
 
           <div className="rounded-xl border bg-card p-4">
             <div className="mb-3 flex items-center gap-2">

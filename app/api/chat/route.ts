@@ -37,6 +37,52 @@ function createSseEncoder() {
     encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function buildActionDonePayload(state: Awaited<ReturnType<typeof runChatGraph>>) {
+  const plannedAction = state.plannedAction;
+  const summary = state.actionSummary || undefined;
+  const error = state.actionValidationError || undefined;
+  const memoryCandidateCount = state.actionMemoryCandidates.length;
+
+  let executorName: string | undefined;
+  let args: Record<string, unknown> | undefined;
+
+  if (plannedAction === "skill") {
+    executorName = state.selectedSkill || undefined;
+    args = isPlainObject(state.skillArgs) && Object.keys(state.skillArgs).length > 0
+      ? state.skillArgs
+      : undefined;
+  } else if (plannedAction === "mcp") {
+    executorName = state.selectedTool || undefined;
+    args = isPlainObject(state.toolArgs) && Object.keys(state.toolArgs).length > 0
+      ? state.toolArgs
+      : undefined;
+  }
+
+  if (
+    plannedAction === "chat" &&
+    !summary &&
+    !error &&
+    memoryCandidateCount === 0 &&
+    !executorName &&
+    !args
+  ) {
+    return null;
+  }
+
+  return {
+    plannedAction,
+    executorName,
+    summary,
+    error,
+    args,
+    memoryCandidateCount,
+  };
+}
+
 export async function POST(request: Request) {
   const startedAt = Date.now();
   const payload = await request.json().catch(() => null);
@@ -116,6 +162,7 @@ export async function POST(request: Request) {
           traceId,
           retrievedCount: finalState.retrievedMemories.length,
           persistedCount: finalState.persistedCount,
+          action: buildActionDonePayload(finalState),
         });
 
         recordMetric({
