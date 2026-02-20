@@ -620,7 +620,11 @@ export function ToolUiChatWorkbench() {
             traceId: params.traceId ?? current.traceId,
             durationMs,
           };
-          setTerminalHistory((history) => [completedSession, ...history].slice(0, 6));
+          setTerminalHistory((history) => {
+            // Filter out any existing session with the same ID to prevent duplicates
+            const filtered = history.filter((s) => s.id !== completedSession.id);
+            return [completedSession, ...filtered].slice(0, 6);
+          });
           return null;
         });
       };
@@ -1134,7 +1138,7 @@ export function ToolUiChatWorkbench() {
               <label className="flex flex-col gap-1">
                 <span className="text-muted-foreground text-xs">JWT Bearer Token（优先）</span>
                 <textarea
-                  className="border-input bg-background min-h-20 resize-y rounded-md border px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="border-input bg-background text-foreground min-h-20 resize-y rounded-md border px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   placeholder="粘贴 JWT；有值时将自动使用 Authorization 头"
                   value={jwtToken}
                   onChange={(event) => setJwtToken(event.target.value)}
@@ -1145,7 +1149,7 @@ export function ToolUiChatWorkbench() {
                 <label className="flex flex-col gap-1">
                   <span className="text-muted-foreground text-xs">tenantId（本地模式）</span>
                   <input
-                    className="border-input bg-background rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="border-input bg-background text-foreground rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                     value={tenantId}
                     onChange={(event) => setTenantId(event.target.value)}
                   />
@@ -1153,7 +1157,7 @@ export function ToolUiChatWorkbench() {
                 <label className="flex flex-col gap-1">
                   <span className="text-muted-foreground text-xs">userId（本地模式）</span>
                   <input
-                    className="border-input bg-background rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="border-input bg-background text-foreground rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                     value={userId}
                     onChange={(event) => setUserId(event.target.value)}
                   />
@@ -1239,7 +1243,7 @@ export function ToolUiChatWorkbench() {
                         "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6",
                         isUser
                           ? "bg-primary text-primary-foreground"
-                          : "bg-background border shadow-xs",
+                          : "bg-background text-foreground border shadow-xs",
                       )}
                     >
                       <p className="whitespace-pre-wrap">
@@ -1320,7 +1324,7 @@ export function ToolUiChatWorkbench() {
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder="输入消息（Enter 发送，Shift+Enter 换行）"
-              className="border-input bg-background min-h-28 w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="border-input bg-background text-foreground min-h-28 w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             />
 
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1379,7 +1383,7 @@ export function ToolUiChatWorkbench() {
             </div>
             <textarea
               ref={replayDraftInputRef}
-              className="border-input bg-background min-h-28 w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="border-input bg-background text-foreground min-h-28 w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               value={replayDraft.message}
               onChange={(event) => handleReplayDraftMessageChange(event.target.value)}
               onKeyDown={handleReplayDraftKeyDown}

@@ -7,9 +7,9 @@
     "doc": "docs"
   },
   "scripts": {
-    "predev": "node scripts/validate-env.mjs",
+    "predev": "node -r dotenv/config scripts/validate-env.mjs dotenv_config_path=.env.local",
     "dev": "next dev",
-    "prebuild": "node scripts/validate-env.mjs",
+    "prebuild": "node -r dotenv/config scripts/validate-env.mjs dotenv_config_path=.env.local",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
@@ -56,6 +56,7 @@
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "dotenv": "^17.3.1",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.6",
     "postcss": "^8.5.6",

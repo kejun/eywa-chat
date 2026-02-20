@@ -1,3 +1,14 @@
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env.local from project root
+const envPath = path.resolve(__dirname, "..", ".env.local");
+dotenv.config({ path: envPath });
+
 const requiredKeys = [
   "DASHSCOPE_API_KEY",
   "SEEKDB_HOST",
