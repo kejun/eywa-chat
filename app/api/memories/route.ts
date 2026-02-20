@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveRequestIdentity } from "@/lib/auth/context";
-import { memoryRepository, MemoryTypeSchema } from "@/lib/memory";
+import { memoryRepositoryInstance as memoryRepository, MemoryTypeSchema } from "@/lib/memory";
 import { recordMetric } from "@/lib/observability";
 
 export const runtime = "nodejs";

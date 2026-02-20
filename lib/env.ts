@@ -9,11 +9,11 @@ const EnvSchema = z
       .string()
       .url()
       .default("https://dashscope.aliyuncs.com/compatible-mode/v1"),
-    SEEKDB_HOST: z.string().min(1, "SEEKDB_HOST is required"),
-    SEEKDB_PORT: z.coerce.number().int().positive(),
-    SEEKDB_USER: z.string().min(1, "SEEKDB_USER is required"),
-    SEEKDB_PASSWORD: z.string().min(1, "SEEKDB_PASSWORD is required"),
-    SEEKDB_DATABASE: z.string().min(1, "SEEKDB_DATABASE is required"),
+    SEEKDB_HOST: z.string().optional(),
+    SEEKDB_PORT: z.coerce.number().int().positive().optional(),
+    SEEKDB_USER: z.string().optional(),
+    SEEKDB_PASSWORD: z.string().optional(),
+    SEEKDB_DATABASE: z.string().optional(),
     ALLOW_INSECURE_CONTEXT: z.enum(["0", "1"]).default("0"),
     AUTH_JWT_SECRET: z.string().optional(),
     AUTH_TENANT_CLAIM: z.string().default("tenantId"),

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isCronAuthorized } from "@/lib/cron/auth";
 import { logger } from "@/lib/logger";
-import { memoryRepository } from "@/lib/memory";
+import { memoryRepositoryInstance as memoryRepository } from "@/lib/memory";
 import { recordMetric } from "@/lib/observability";
 
 export const runtime = "nodejs";

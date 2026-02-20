@@ -10,6 +10,14 @@ type GlobalSeekdbCache = typeof globalThis & {
 };
 
 function createSeekdbClient() {
+  if (!env.SEEKDB_HOST || !env.SEEKDB_PORT || !env.SEEKDB_USER || !env.SEEKDB_PASSWORD || !env.SEEKDB_DATABASE) {
+    logger.warn("seekdb-not-configured", {
+      message: "SeekDB is not configured. Memory persistence will be disabled.",
+      hint: "Set SEEKDB_HOST, SEEKDB_PORT, SEEKDB_USER, SEEKDB_PASSWORD, and SEEKDB_DATABASE environment variables.",
+    });
+    throw new Error("SeekDB not configured");
+  }
+
   return new SeekdbClient({
     host: env.SEEKDB_HOST,
     port: env.SEEKDB_PORT,

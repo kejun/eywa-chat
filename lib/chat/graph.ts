@@ -4,7 +4,7 @@ import { extractMemoryCandidates } from "@/lib/chat/memory-extractor";
 import { getChatModel } from "@/lib/chat/model";
 import { buildSystemPrompt } from "@/lib/chat/prompt";
 import { ChatStateAnnotation, type ChatGraphInput, type ChatState } from "@/lib/chat/state";
-import { memoryRepository } from "@/lib/memory";
+import { memoryRepositoryInstance as memoryRepository } from "@/lib/memory";
 import { logger } from "@/lib/logger";
 import { mcpAdapter } from "@/lib/mcp";
 import { skillRegistry } from "@/lib/skills";
@@ -324,16 +324,22 @@ const persistMemoriesNode = async (state: ChatState) => {
 
   try {
     const upserted = await memoryRepository.upsertMemories(state.memoryWriteCandidates);
+    logger.info("chat-memories-persisted", {
+      traceId: state.traceId,
+      count: upserted.length,
+    });
     return {
       persistedCount: upserted.length,
     };
   } catch (error) {
-    logger.warn("chat-persist-memories-failed", {
+    logger.error("chat-persist-memories-failed", {
       traceId: state.traceId,
       reason: error instanceof Error ? error.message : String(error),
+      hint: "Ensure SeekDB is configured and accessible. Check SEEKDB_* environment variables.",
     });
     return {
       persistedCount: 0,
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 };
