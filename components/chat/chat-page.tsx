@@ -664,7 +664,7 @@ export function ChatPage() {
 
                 return (
                   <div key={msg.id} className="flex justify-start">
-                    <div className="max-w-[85%] min-w-0 space-y-2">
+                    <div className="max-w-[85%] min-w-0 rounded-2xl bg-muted px-4 py-3 text-foreground">
                       <ThinkingBlock
                         isActive={isCurrentlyStreaming && !hasContent}
                         data={msg.thinking}
