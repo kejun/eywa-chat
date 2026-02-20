@@ -611,7 +611,7 @@ export function ChatPage() {
         <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
           {showWelcome ? (
             <div className="flex min-h-[60vh] flex-col items-center justify-center">
-              <div className="mb-2 flex size-14 items-center justify-center rounded-2xl overflow-hidden bg-muted">
+              <div className="mb-2 flex size-64 items-center justify-center rounded-2xl overflow-hidden bg-muted">
                 <img src="/logo.jpg" alt="Eywa Logo" className="size-full object-cover" />
               </div>
               <h2 className="mb-1 text-xl font-semibold">你好，我是 Eywa</h2>
