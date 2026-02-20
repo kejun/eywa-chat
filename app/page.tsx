@@ -1,5 +1,5 @@
-import { ToolUiChatWorkbench } from "@/components/chat/tool-ui-chat-workbench";
+import { ChatPage } from "@/components/chat/chat-page";
 
 export default function HomePage() {
-  return <ToolUiChatWorkbench />;
+  return <ChatPage />;
 }

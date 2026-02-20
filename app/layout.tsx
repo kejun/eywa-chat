@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Eywa Chat",
-  description: "Persistent-memory chatbot",
+  title: "Eywa",
+  description: "AI assistant with persistent memory",
 };
 
 type RootLayoutProps = Readonly<{

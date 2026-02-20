@@ -55,12 +55,7 @@ body {
   min-height: 100vh;
   background: Canvas;
   color: CanvasText;
-}
-
-main {
-  margin: 0 auto;
-  max-width: 760px;
-  padding: 2rem 1rem;
+  overflow: hidden;
 }
 
 @theme inline {
