@@ -5,17 +5,5 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "outputDirectory": ".next",
-  "regions": ["sin1"],
-  "env": {
-    "DASHSCOPE_API_KEY": "@dashscope-api-key",
-    "DASHSCOPE_MODEL": "@dashscope-model",
-    "DASHSCOPE_BASE_URL": "@dashscope-base-url",
-    "SEEKDB_HOST": "@seekdb-host",
-    "SEEKDB_PORT": "@seekdb-port",
-    "SEEKDB_USER": "@seekdb-user",
-    "SEEKDB_PASSWORD": "@seekdb-password",
-    "SEEKDB_DATABASE": "@seekdb-database",
-    "AUTH_JWT_SECRET": "@auth-jwt-secret",
-    "ALLOW_INSECURE_CONTEXT": "@allow-insecure-context"
-  }
+  "regions": ["sin1"]
 }
