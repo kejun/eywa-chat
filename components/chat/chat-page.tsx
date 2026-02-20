@@ -25,6 +25,7 @@ import {
 } from "@/components/chat/action-surface-registry";
 import { ensureActionSurfaceResolversBootstrapped } from "@/components/chat/action-surface-bootstrap";
 import { ThinkingBlock, type ThinkingData } from "@/components/chat/thinking-block";
+import { MarkdownContent } from "@/components/chat/markdown-content";
 import {
   SettingsDrawer,
   type SettingsValues,
@@ -670,9 +671,7 @@ export function ChatPage() {
                       />
 
                       {hasContent ? (
-                        <div className="text-sm leading-relaxed text-foreground">
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                        </div>
+                        <MarkdownContent content={msg.content} />
                       ) : isCurrentlyStreaming ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Loader2 className="size-3.5 animate-spin" />
