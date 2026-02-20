@@ -128,7 +128,7 @@ export function SettingsDrawer({
                 JWT Bearer Token（优先）
               </span>
               <textarea
-                className="min-h-20 resize-y rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
+                className="min-h-20 resize-y rounded-lg border border-input bg-background text-foreground px-3 py-2 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
                 placeholder="粘贴 JWT；有值时将自动使用 Authorization 头"
                 value={settings.jwtToken}
                 onChange={(e) => updateField("jwtToken", e.target.value)}
@@ -141,7 +141,7 @@ export function SettingsDrawer({
                   tenantId（本地模式）
                 </span>
                 <input
-                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="rounded-lg border border-input bg-background text-foreground px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   value={settings.tenantId}
                   onChange={(e) => updateField("tenantId", e.target.value)}
                   disabled={jwtMode}
@@ -152,7 +152,7 @@ export function SettingsDrawer({
                   userId（本地模式）
                 </span>
                 <input
-                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="rounded-lg border border-input bg-background text-foreground px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   value={settings.userId}
                   onChange={(e) => updateField("userId", e.target.value)}
                   disabled={jwtMode}

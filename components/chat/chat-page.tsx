@@ -712,7 +712,7 @@ export function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="输入消息（Enter 发送，Shift+Enter 换行）"
                 rows={1}
-                className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
+                className="w-full resize-none rounded-xl border border-input bg-background text-foreground px-4 py-3 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
                 style={{ maxHeight: "200px" }}
               />
             </div>
