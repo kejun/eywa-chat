@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  seekdb:
+    image: ghcr.io/seek-db/seekdb:latest
+    container_name: seekdb
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data:/var/lib/seekdb
+      - ./config:/etc/seekdb
+    environment:
+      - SEEKDB_ADMIN_PASSWORD=${SEEKDB_ADMIN_PASSWORD:-changeme}
+      - SEEKDB_HTTP_PORT=6333
+    networks:
+      - seekdb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  seekdb-network:
+    driver: bridge
