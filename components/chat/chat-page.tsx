@@ -19,6 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   type ActionDonePayload,
+  buildActionCardId,
+  buildActionSurface,
   parseActionDonePayload,
 } from "@/components/chat/action-surface-registry";
 import { ensureActionSurfaceResolversBootstrapped } from "@/components/chat/action-surface-bootstrap";
@@ -26,7 +28,14 @@ import { ThinkingBlock, type ThinkingData } from "@/components/chat/thinking-blo
 import {
   SettingsDrawer,
   type SettingsValues,
+  type TerminalSession,
 } from "@/components/chat/settings-drawer";
+import {
+  OptionList,
+} from "@/components/tool-ui/option-list";
+import { Plan } from "@/components/tool-ui/plan";
+import { MessageDraft } from "@/components/tool-ui/message-draft";
+import { Terminal } from "@/components/tool-ui/terminal";
 
 type MessageRole = "user" | "assistant";
 
@@ -42,24 +51,28 @@ const THREAD_STORAGE_KEY = "eywa.chat.threadId";
 
 const SUGGESTIONS = [
   {
-    id: "remember-prefs",
-    label: "Remember my preferences",
-    prompt: "Please remember: reply in Chinese by default, give conclusions first then steps, keep it concise.",
+    id: "memory-preferences",
+    label: "记住我的偏好",
+    description: "例如语言风格、输出格式与工作习惯。",
+    prompt: "请记住：默认用中文回复我，先给结论再给步骤，尽量简洁。",
   },
   {
     id: "task-breakdown",
-    label: "Break down a task",
-    prompt: "I want to launch a chatbot with persistent memory in two weeks. Please create a day-by-day execution plan.",
+    label: "帮我拆解任务",
+    description: "把一个复杂目标拆成可执行步骤。",
+    prompt: "我要在两周内上线一个带持久化记忆的聊天机器人，请按天拆解执行计划。",
   },
   {
-    id: "recall-memory",
-    label: "What do you remember about me?",
-    prompt: "Please summarize what you already remember about my preferences and long-term information, and mark any uncertain items.",
+    id: "memory-recall",
+    label: "回顾已记住内容",
+    description: "让我总结已沉淀的长期记忆。",
+    prompt: "请总结你已经记住了我哪些偏好和长期信息，并标注不确定项。",
   },
   {
-    id: "trigger-action",
-    label: "Plan a trip to Shanghai",
-    prompt: "I want to arrange a business trip to Shanghai. Please give me an execution plan first, then list the tools you would use.",
+    id: "action-workflow",
+    label: "触发行动编排",
+    description: "测试 MCP/Skills 的任务执行路径。",
+    prompt: "我想安排一次上海出差，请先给出执行计划，再列出你会调用的工具。",
   },
 ] as const;
 
@@ -78,6 +91,12 @@ function createThreadId() {
 
 function createMessageId(prefix: MessageRole) {
   return `${prefix}-${Date.now().toString(36)}-${createShortId()}`;
+}
+
+function toSingleLine(text: string, maxLength: number) {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLength) return compact;
+  return `${compact.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
 type StreamPayload = Record<string, unknown>;
@@ -151,6 +170,62 @@ async function consumeSseStream(
   }
 }
 
+function renderActionSurfaceCard(params: {
+  action: ActionDonePayload;
+  scope: string;
+  userId: string;
+}) {
+  const surface = buildActionSurface(params.action, params.userId);
+  if (!surface) {
+    return null;
+  }
+
+  if (surface.kind === "preference") {
+    return (
+      <OptionList
+        id={buildActionCardId(params.action, `${params.scope}-preference-option`)}
+        options={[
+          {
+            id: "selected",
+            label: surface.optionLabel,
+            description: surface.description,
+          },
+        ]}
+        selectionMode="single"
+        choice="selected"
+      />
+    );
+  }
+
+  if (surface.kind === "task") {
+    return (
+      <Plan
+        id={buildActionCardId(params.action, `${params.scope}-task-plan`)}
+        title="任务捕获结果"
+        description={surface.description ?? "已写入任务记忆"}
+        todos={[
+          {
+            id: "task-captured",
+            label: surface.taskTitle,
+            status: "completed",
+          },
+        ]}
+        maxVisibleTodos={1}
+      />
+    );
+  }
+
+  if (surface.kind === "echo") {
+    return <MessageDraft {...surface.draft} />;
+  }
+
+  if (surface.kind === "time" || surface.kind === "generic") {
+    return <Terminal {...surface.terminal} />;
+  }
+
+  return null;
+}
+
 export function ChatPage() {
   const [threadId, setThreadId] = useState("");
   const [settings, setSettings] = useState<SettingsValues>({
@@ -164,6 +239,8 @@ export function ChatPage() {
   const [isSending, setIsSending] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentStreamingId, setCurrentStreamingId] = useState<string | null>(null);
+  const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
+  const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
   const messagePanelRef = useRef<HTMLDivElement>(null);
@@ -189,7 +266,14 @@ export function ChatPage() {
     setMessages([]);
     setErrorText(null);
     setCurrentStreamingId(null);
+    setActiveTerminal(null);
+    setTerminalHistory([]);
     window.localStorage.setItem(THREAD_STORAGE_KEY, nextId);
+  }, []);
+
+  const handleClearTerminalHistory = useCallback(() => {
+    setActiveTerminal(null);
+    setTerminalHistory([]);
   }, []);
 
   const updateAssistantMessage = useCallback(
@@ -208,7 +292,7 @@ export function ChatPage() {
       const messageText = rawText.trim();
       if (!messageText || isSending) return;
       if (!threadId) {
-        setErrorText("Thread not initialized yet.");
+        setErrorText("线程尚未初始化，请稍后再试。");
         return;
       }
 
@@ -216,13 +300,45 @@ export function ChatPage() {
       const resolvedTenantId = settings.tenantId.trim();
       const resolvedUserId = settings.userId.trim();
       if (!token && (!resolvedTenantId || !resolvedUserId)) {
-        setErrorText("Please configure authentication in Settings.");
+        setErrorText("请在设置中配置身份认证。");
         setSettingsOpen(true);
         return;
       }
 
       const userMessageId = createMessageId("user");
       const assistantMessageId = createMessageId("assistant");
+      const terminalId = `terminal-${Date.now().toString(36)}-${createShortId()}`;
+      const requestStartedAt = Date.now();
+      let tokenChunkCount = 0;
+      let terminalFinalized = false;
+
+      const appendTerminalLine = (line: string) => {
+        setActiveTerminal((current) => {
+          if (!current || current.id !== terminalId) return current;
+          return { ...current, stdout: current.stdout ? `${current.stdout}\n${line}` : line };
+        });
+      };
+
+      const finalizeTerminal = (params: { exitCode: number; stderr?: string; traceId?: string }) => {
+        if (terminalFinalized) return;
+        terminalFinalized = true;
+        const durationMs = Date.now() - requestStartedAt;
+        setActiveTerminal((current) => {
+          if (!current || current.id !== terminalId) return current;
+          const completedSession: TerminalSession = {
+            ...current,
+            exitCode: params.exitCode,
+            stderr: params.stderr,
+            traceId: params.traceId ?? current.traceId,
+            durationMs,
+          };
+          setTerminalHistory((history) => {
+            const filtered = history.filter((s) => s.id !== completedSession.id);
+            return [completedSession, ...filtered].slice(0, 6);
+          });
+          return null;
+        });
+      };
 
       setMessages((prev) => [
         ...prev,
@@ -234,6 +350,17 @@ export function ChatPage() {
       setErrorText(null);
       setIsSending(true);
       setCurrentStreamingId(assistantMessageId);
+      setActiveTerminal({
+        id: terminalId,
+        command: `POST /api/chat --thread ${threadId}`,
+        stdout: [
+          `[request] ${new Date(requestStartedAt).toISOString()}`,
+          `[input] ${toSingleLine(messageText, 120)}`,
+        ].join("\n"),
+        exitCode: 0,
+        cwd: "/api/chat",
+        maxCollapsedLines: 10,
+      });
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -243,9 +370,11 @@ export function ChatPage() {
 
         if (token) {
           headers.set("authorization", `Bearer ${token}`);
+          appendTerminalLine("[auth] bearer token");
         } else {
           headers.set("x-tenant-id", resolvedTenantId);
           headers.set("x-user-id", resolvedUserId);
+          appendTerminalLine(`[auth] header mode tenant=${resolvedTenantId} user=${resolvedUserId}`);
         }
 
         const response = await fetch("/api/chat", {
@@ -254,14 +383,15 @@ export function ChatPage() {
           body: JSON.stringify({ threadId, message: messageText }),
           signal: controller.signal,
         });
+        appendTerminalLine(`[http] status ${response.status}`);
 
         if (!response.ok) {
           const bodyText = await response.text();
-          let message = `Request failed (${response.status})`;
+          let message = `请求失败（${response.status}）`;
           try {
             const parsed = JSON.parse(bodyText) as { error?: string };
             if (parsed.error) {
-              message = `${parsed.error} (${response.status})`;
+              message = `${parsed.error}（${response.status}）`;
             }
           } catch {
             if (bodyText.trim()) {
@@ -272,7 +402,7 @@ export function ChatPage() {
         }
 
         if (!response.body) {
-          throw new Error("Empty response stream.");
+          throw new Error("响应流为空，无法建立流式会话。");
         }
 
         let streamTraceId: string | undefined;
@@ -285,6 +415,11 @@ export function ChatPage() {
                 : undefined;
             if (nextTraceId) {
               streamTraceId = nextTraceId;
+              setActiveTerminal((current) => {
+                if (!current || current.id !== terminalId) return current;
+                return { ...current, traceId: nextTraceId };
+              });
+              appendTerminalLine(`[meta] traceId=${nextTraceId}`);
               updateAssistantMessage(assistantMessageId, (msg) => ({
                 ...msg,
                 traceId: nextTraceId,
@@ -294,12 +429,16 @@ export function ChatPage() {
           }
 
           if (event === "token") {
+            tokenChunkCount += 1;
             const tokenText = typeof payload.text === "string" ? payload.text : "";
             if (tokenText) {
               updateAssistantMessage(assistantMessageId, (msg) => ({
                 ...msg,
                 content: msg.content + tokenText,
               }));
+              if (tokenChunkCount === 1 || tokenChunkCount % 20 === 0) {
+                appendTerminalLine(`[token] chunks=${tokenChunkCount}`);
+              }
             }
             return;
           }
@@ -321,6 +460,7 @@ export function ChatPage() {
               persistedCount: donePersistedCount,
               action: parsedAction,
               degraded,
+              traceId: doneTraceId ?? streamTraceId,
             };
 
             updateAssistantMessage(assistantMessageId, (msg) => ({
@@ -330,30 +470,48 @@ export function ChatPage() {
             }));
 
             if (degraded) {
-              setErrorText("Model degraded. The response may be incomplete.");
+              setErrorText("模型已降级处理，本轮回复可用但建议稍后重试。");
             }
+
+            appendTerminalLine(
+              `[done] retrieved=${doneRetrievedCount ?? 0} persisted=${donePersistedCount ?? 0} degraded=${degraded}`,
+            );
+            if (parsedAction) {
+              appendTerminalLine(
+                `[action] ${parsedAction.plannedAction}:${parsedAction.executorName ?? "n/a"} error=${parsedAction.error ? "yes" : "no"}`,
+              );
+            }
+            finalizeTerminal({ exitCode: 0, traceId: doneTraceId });
           }
         });
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Request failed. Please check your settings.";
+          error instanceof Error ? error.message : "请求失败，请检查网络或服务配置。";
 
         if (controller.signal.aborted) {
-          setErrorText("Generation stopped.");
+          setErrorText("本轮生成已停止。");
+          appendTerminalLine("[abort] generation cancelled by user");
           updateAssistantMessage(assistantMessageId, (msg) => ({
             ...msg,
-            content: msg.content || "(Generation stopped by user)",
+            content: msg.content || "（已手动停止本轮生成）",
           }));
+          finalizeTerminal({ exitCode: 130, stderr: "aborted by user" });
         } else {
           setErrorText(message);
+          appendTerminalLine(`[error] ${message}`);
           updateAssistantMessage(assistantMessageId, (msg) => ({
             ...msg,
-            content: msg.content || `Error: ${message}`,
+            content: msg.content || `请求失败：${message}`,
           }));
+          finalizeTerminal({ exitCode: 1, stderr: message });
         }
 
       } finally {
         abortRef.current = null;
+        if (!terminalFinalized) {
+          appendTerminalLine("[finalize] stream closed");
+          finalizeTerminal({ exitCode: 0 });
+        }
         setIsSending(false);
         setCurrentStreamingId(null);
       }
@@ -436,7 +594,7 @@ export function ChatPage() {
             <h1 className="text-base font-semibold leading-tight">Eywa</h1>
             {memoryStats.totalPersisted > 0 && (
               <p className="text-[11px] text-muted-foreground leading-tight">
-                {memoryStats.totalPersisted} memories saved
+                已保存 {memoryStats.totalPersisted} 条记忆
               </p>
             )}
           </div>
@@ -459,10 +617,10 @@ export function ChatPage() {
               <div className="mb-2 flex size-14 items-center justify-center rounded-2xl bg-primary/10">
                 <Sparkles className="size-7 text-primary" />
               </div>
-              <h2 className="mb-1 text-xl font-semibold">Hi, I&apos;m Eywa</h2>
+              <h2 className="mb-1 text-xl font-semibold">你好，我是 Eywa</h2>
               <p className="mb-8 text-center text-sm text-muted-foreground max-w-sm">
-                I remember your preferences and can help with tasks.
-                What would you like to talk about?
+                我能记住你的偏好，帮你拆解任务、调用工具。
+                试试下面的快捷提问，或直接输入你的问题。
               </p>
 
               <div className="grid w-full max-w-md grid-cols-1 gap-2 sm:grid-cols-2">
@@ -472,9 +630,10 @@ export function ChatPage() {
                     type="button"
                     onClick={() => handleSuggestionClick(s.prompt)}
                     disabled={isSending}
-                    className="rounded-xl border bg-card px-4 py-3 text-left text-sm transition-colors hover:bg-accent hover:border-accent-foreground/20 disabled:opacity-50"
+                    className="rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:bg-accent hover:border-accent-foreground/20 disabled:opacity-50"
                   >
-                    {s.label}
+                    <span className="block text-sm font-medium">{s.label}</span>
+                    <span className="block mt-0.5 text-xs text-muted-foreground">{s.description}</span>
                   </button>
                 ))}
               </div>
@@ -496,9 +655,18 @@ export function ChatPage() {
                   );
                 }
 
+                const actionCard =
+                  msg.thinking?.action && msg.thinking.action.plannedAction !== "chat"
+                    ? renderActionSurfaceCard({
+                        action: msg.thinking.action,
+                        scope: `msg-${msg.id}`,
+                        userId: settings.userId,
+                      })
+                    : null;
+
                 return (
                   <div key={msg.id} className="flex justify-start">
-                    <div className="max-w-[85%] min-w-0">
+                    <div className="max-w-[85%] min-w-0 space-y-2">
                       <ThinkingBlock
                         isActive={isCurrentlyStreaming && !hasContent}
                         data={msg.thinking}
@@ -511,9 +679,15 @@ export function ChatPage() {
                       ) : isCurrentlyStreaming ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Loader2 className="size-3.5 animate-spin" />
-                          <span>Generating...</span>
+                          <span>正在生成...</span>
                         </div>
                       ) : null}
+
+                      {actionCard && (
+                        <div className="mt-2">
+                          {actionCard}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -540,7 +714,7 @@ export function ChatPage() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Send a message..."
+                placeholder="输入消息（Enter 发送，Shift+Enter 换行）"
                 rows={1}
                 className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 pr-12 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
                 style={{ maxHeight: "200px" }}
@@ -570,7 +744,7 @@ export function ChatPage() {
           </form>
 
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Memory is always on. Your conversations help Eywa understand you better.
+            记忆功能始终开启，对话内容将自动沉淀为长期记忆。
           </p>
         </div>
       </div>
@@ -582,6 +756,9 @@ export function ChatPage() {
         onSettingsChange={setSettings}
         threadId={threadId}
         onNewThread={refreshThread}
+        activeTerminal={activeTerminal}
+        terminalHistory={terminalHistory}
+        onClearTerminalHistory={handleClearTerminalHistory}
       />
     </div>
   );

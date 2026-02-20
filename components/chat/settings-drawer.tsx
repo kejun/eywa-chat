@@ -1,14 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { X, ShieldCheck, Brain, Info, RotateCcw } from "lucide-react";
+import { X, ShieldCheck, Brain, Info, RotateCcw, TerminalSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Terminal, type SerializableTerminal } from "@/components/tool-ui/terminal";
 import { cn } from "@/lib/utils";
 
 export type SettingsValues = {
   jwtToken: string;
   tenantId: string;
   userId: string;
+};
+
+export type TerminalSession = SerializableTerminal & {
+  traceId?: string;
 };
 
 type SettingsDrawerProps = {
@@ -18,6 +23,9 @@ type SettingsDrawerProps = {
   onSettingsChange: (settings: SettingsValues) => void;
   threadId: string;
   onNewThread: () => void;
+  activeTerminal: TerminalSession | null;
+  terminalHistory: TerminalSession[];
+  onClearTerminalHistory: () => void;
 };
 
 function SectionTitle({
@@ -42,6 +50,9 @@ export function SettingsDrawer({
   onSettingsChange,
   threadId,
   onNewThread,
+  activeTerminal,
+  terminalHistory,
+  onClearTerminalHistory,
 }: SettingsDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +81,7 @@ export function SettingsDrawer({
   );
 
   const jwtMode = settings.jwtToken.trim().length > 0;
+  const hasTerminalData = activeTerminal !== null || terminalHistory.length > 0;
 
   return (
     <>
@@ -89,10 +101,10 @@ export function SettingsDrawer({
         )}
         role="dialog"
         aria-modal="true"
-        aria-label="Settings"
+        aria-label="设置"
       >
         <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-lg font-semibold">Settings</h2>
+          <h2 className="text-lg font-semibold">设置</h2>
           <Button
             variant="ghost"
             size="sm"
@@ -106,21 +118,21 @@ export function SettingsDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
           <section className="space-y-3">
             <SectionTitle icon={<ShieldCheck className="size-4 text-muted-foreground" />}>
-              Authentication
+              鉴权配置
             </SectionTitle>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {jwtMode
-                ? "Using JWT Bearer Token for secure authentication."
-                : "Using header-based local mode (requires ALLOW_INSECURE_CONTEXT=1)."}
+              当前模式：{jwtMode
+                ? "JWT 安全模式"
+                : "Header 本地模式（需 ALLOW_INSECURE_CONTEXT=1）"}
             </p>
 
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">
-                JWT Bearer Token
+                JWT Bearer Token（优先）
               </span>
               <textarea
                 className="min-h-20 resize-y rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
-                placeholder="Paste JWT token here..."
+                placeholder="粘贴 JWT；有值时将自动使用 Authorization 头"
                 value={settings.jwtToken}
                 onChange={(e) => updateField("jwtToken", e.target.value)}
               />
@@ -129,7 +141,7 @@ export function SettingsDrawer({
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Tenant ID
+                  tenantId（本地模式）
                 </span>
                 <input
                   className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
@@ -140,7 +152,7 @@ export function SettingsDrawer({
               </label>
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">
-                  User ID
+                  userId（本地模式）
                 </span>
                 <input
                   className="rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
@@ -156,17 +168,16 @@ export function SettingsDrawer({
 
           <section className="space-y-3">
             <SectionTitle icon={<Brain className="size-4 text-muted-foreground" />}>
-              Memory
+              记忆
             </SectionTitle>
             <div className="rounded-lg bg-muted/50 p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-emerald-500" />
-                <span className="text-sm font-medium">Always On</span>
+                <span className="text-sm font-medium">始终开启</span>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Your preferences, facts, and conversation history are
-                automatically remembered across sessions. Memory retrieval and
-                persistence happen transparently in every conversation.
+                你的偏好、事实与对话历史会自动跨会话记住。
+                每次对话都会透明地进行记忆检索与沉淀。
               </p>
             </div>
           </section>
@@ -175,12 +186,12 @@ export function SettingsDrawer({
 
           <section className="space-y-3">
             <SectionTitle icon={<Info className="size-4 text-muted-foreground" />}>
-              Thread
+              会话线程
             </SectionTitle>
             <div className="space-y-2">
               <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
                 <code className="text-xs text-muted-foreground font-mono truncate max-w-[240px]">
-                  {threadId || "Initializing..."}
+                  {threadId || "初始化中..."}
                 </code>
                 <Button
                   variant="ghost"
@@ -189,15 +200,48 @@ export function SettingsDrawer({
                   className="h-7 gap-1.5 text-xs"
                 >
                   <RotateCcw className="size-3" />
-                  New
+                  新线程
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Each thread is an independent conversation context. Starting a
-                new thread clears the current conversation but retains your
-                long-term memories.
+                每个线程是一个独立的对话上下文。开始新线程会清空当前对话，
+                但你的长期记忆会保留。
               </p>
             </div>
+          </section>
+
+          <div className="h-px bg-border" />
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <SectionTitle icon={<TerminalSquare className="size-4 text-muted-foreground" />}>
+                请求诊断
+              </SectionTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onClearTerminalHistory}
+                disabled={!hasTerminalData}
+                className="h-7 text-xs"
+              >
+                清空
+              </Button>
+            </div>
+
+            {activeTerminal ? (
+              <Terminal {...activeTerminal} expanded />
+            ) : terminalHistory.length > 0 ? (
+              <div className="space-y-2">
+                {terminalHistory.map((session) => (
+                  <Terminal key={session.id} {...session} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-muted-foreground rounded-lg border border-dashed p-3 text-xs">
+                发送消息后，这里会显示 /api/chat 的请求与流式回包日志。
+              </div>
+            )}
           </section>
         </div>
 
