@@ -3,17 +3,14 @@
 import { useCallback, useEffect, useRef } from "react";
 import { X, ShieldCheck, Brain, Info, RotateCcw, TerminalSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Terminal, type SerializableTerminal } from "@/components/tool-ui/terminal";
+import { Terminal } from "@/components/tool-ui/terminal";
 import { cn } from "@/lib/utils";
+import type { TerminalSession } from "@/components/chat/types";
 
 export type SettingsValues = {
   jwtToken: string;
   tenantId: string;
   userId: string;
-};
-
-export type TerminalSession = SerializableTerminal & {
-  traceId?: string;
 };
 
 type SettingsDrawerProps = {

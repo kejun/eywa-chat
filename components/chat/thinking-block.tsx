@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   Fingerprint,
   CheckCircle2,
-  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActionDonePayload } from "@/components/chat/action-surface-registry";
@@ -148,12 +147,6 @@ function buildSummaryText(data: ThinkingData): string {
   return parts.join(" · ");
 }
 
-function StepStatusIcon({ status }: { status: ThinkingStep["status"] }) {
-  if (status === "success") return <CheckCircle2 className="size-3 text-emerald-600" />;
-  if (status === "warning") return <XCircle className="size-3 text-amber-600" />;
-  return null;
-}
-
 export function ThinkingBlock({ isActive, data }: ThinkingBlockProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -209,18 +202,15 @@ export function ThinkingBlock({ isActive, data }: ThinkingBlockProps) {
                 {step.icon}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className={cn(
-                      step.status === "warning"
-                        ? "text-amber-700 dark:text-amber-400"
-                        : "text-foreground/80",
-                    )}
-                  >
-                    {step.label}
-                  </span>
-                  <StepStatusIcon status={step.status} />
-                </div>
+                <span
+                  className={cn(
+                    step.status === "warning"
+                      ? "text-amber-700 dark:text-amber-400"
+                      : "text-foreground/80",
+                  )}
+                >
+                  {step.label}
+                </span>
                 {step.detail && (
                   <p className="mt-0.5 text-muted-foreground leading-relaxed whitespace-pre-wrap break-all">
                     {step.detail}

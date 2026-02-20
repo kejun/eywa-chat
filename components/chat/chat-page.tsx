@@ -28,8 +28,8 @@ import { ThinkingBlock, type ThinkingData } from "@/components/chat/thinking-blo
 import {
   SettingsDrawer,
   type SettingsValues,
-  type TerminalSession,
 } from "@/components/chat/settings-drawer";
+import type { TerminalSession } from "@/components/chat/types";
 import {
   OptionList,
 } from "@/components/tool-ui/option-list";
@@ -552,35 +552,32 @@ export function ChatPage() {
   const composerDisabled = isSending || input.trim().length === 0;
   const showWelcome = messages.length === 0;
 
-  const autoResizeTextarea = useCallback(() => {
+  const syncTextareaHeight = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, []);
 
+  useEffect(() => {
+    syncTextareaHeight();
+  }, [input, syncTextareaHeight]);
+
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setInput(e.target.value);
-      autoResizeTextarea();
     },
-    [autoResizeTextarea],
+    [],
   );
 
-  const memoryStats = useMemo(() => {
-    let totalRetrieved = 0;
-    let totalPersisted = 0;
+  const totalPersistedCount = useMemo(() => {
+    let count = 0;
     for (const msg of messages) {
-      if (msg.thinking) {
-        if (typeof msg.thinking.retrievedCount === "number") {
-          totalRetrieved += msg.thinking.retrievedCount;
-        }
-        if (typeof msg.thinking.persistedCount === "number") {
-          totalPersisted += msg.thinking.persistedCount;
-        }
+      if (typeof msg.thinking?.persistedCount === "number") {
+        count += msg.thinking.persistedCount;
       }
     }
-    return { totalRetrieved, totalPersisted };
+    return count;
   }, [messages]);
 
   return (
@@ -592,9 +589,9 @@ export function ChatPage() {
           </div>
           <div>
             <h1 className="text-base font-semibold leading-tight">Eywa</h1>
-            {memoryStats.totalPersisted > 0 && (
+            {totalPersistedCount > 0 && (
               <p className="text-[11px] text-muted-foreground leading-tight">
-                已保存 {memoryStats.totalPersisted} 条记忆
+                已保存 {totalPersistedCount} 条记忆
               </p>
             )}
           </div>
@@ -716,7 +713,7 @@ export function ChatPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="输入消息（Enter 发送，Shift+Enter 换行）"
                 rows={1}
-                className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 pr-12 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
+                className="w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/40 placeholder:text-muted-foreground/60"
                 style={{ maxHeight: "200px" }}
               />
             </div>

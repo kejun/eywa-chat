@@ -55,7 +55,6 @@ body {
   min-height: 100vh;
   background: Canvas;
   color: CanvasText;
-  overflow: hidden;
 }
 
 @theme inline {
