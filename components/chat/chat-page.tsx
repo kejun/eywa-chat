@@ -13,7 +13,6 @@ import {
   Loader2,
   SendHorizontal,
   Settings,
-  Sparkles,
   Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -585,8 +584,8 @@ export function ChatPage() {
     <div className="flex h-screen flex-col bg-background">
       <header className="flex items-center justify-between border-b px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <Sparkles className="size-4 text-primary-foreground" />
+          <div className="flex size-8 items-center justify-center rounded-lg overflow-hidden">
+            <img src="/logo.jpg" alt="Eywa Logo" className="size-full object-cover" />
           </div>
           <div>
             <h1 className="text-base font-semibold leading-tight">Eywa</h1>
@@ -612,8 +611,8 @@ export function ChatPage() {
         <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
           {showWelcome ? (
             <div className="flex min-h-[60vh] flex-col items-center justify-center">
-              <div className="mb-2 flex size-14 items-center justify-center rounded-2xl bg-primary/10">
-                <Sparkles className="size-7 text-primary" />
+              <div className="mb-2 flex size-14 items-center justify-center rounded-2xl overflow-hidden bg-muted">
+                <img src="/logo.jpg" alt="Eywa Logo" className="size-full object-cover" />
               </div>
               <h2 className="mb-1 text-xl font-semibold">你好，我是 Eywa</h2>
               <p className="mb-8 text-center text-sm text-muted-foreground max-w-sm">
