@@ -20,6 +20,17 @@ class BailianEmbeddingFunction implements EmbeddingFunction {
     this.model = "text-embedding-v4";
   }
 
+  static buildFromConfig(config: Record<string, unknown>): BailianEmbeddingFunction {
+    const instance = new BailianEmbeddingFunction();
+    if (config.model) {
+      instance.model = String(config.model);
+    }
+    if (config.baseUrl) {
+      instance.baseUrl = String(config.baseUrl);
+    }
+    return instance;
+  }
+
   getConfig(): Record<string, unknown> {
     return {
       model: this.model,
