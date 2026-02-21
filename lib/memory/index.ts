@@ -15,10 +15,10 @@ const hasVercelKV = Boolean(process.env.VERCEL_KV_URL || process.env.KV_REST_API
 const hasSeekdbConfig = Boolean(
   env.SEEKDB_HOST &&
   env.SEEKDB_PORT &&
-  env.SEEKDB_USER &&
-  env.SEEKDB_PASSWORD &&
+  env.SEEKDB_USER !== undefined &&
   env.SEEKDB_DATABASE
 );
+// Note: SEEKDB_PASSWORD can be empty string for auth-less setups
 
 let selectedBackend: 'vercel-kv' | 'seekdb' | 'in-memory';
 let repositoryInstance: MemoryRepository | InMemoryMemoryRepository | VercelKVMemoryRepository;
