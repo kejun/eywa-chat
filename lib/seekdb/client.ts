@@ -10,10 +10,13 @@ type GlobalSeekdbCache = typeof globalThis & {
 };
 
 function createSeekdbClient() {
-  if (!env.SEEKDB_HOST || !env.SEEKDB_PORT || !env.SEEKDB_USER || !env.SEEKDB_PASSWORD || !env.SEEKDB_DATABASE) {
+  // SEEKDB_PASSWORD can be empty for auth-less setups
+  const hasRequiredConfig = env.SEEKDB_HOST && env.SEEKDB_PORT && env.SEEKDB_USER !== undefined && env.SEEKDB_DATABASE;
+  
+  if (!hasRequiredConfig) {
     logger.warn("seekdb-not-configured", {
       message: "SeekDB is not configured. Memory persistence will be disabled.",
-      hint: "Set SEEKDB_HOST, SEEKDB_PORT, SEEKDB_USER, SEEKDB_PASSWORD, and SEEKDB_DATABASE environment variables.",
+      hint: "Set SEEKDB_HOST, SEEKDB_PORT, SEEKDB_USER, and SEEKDB_DATABASE environment variables.",
     });
     throw new Error("SeekDB not configured");
   }
@@ -22,7 +25,7 @@ function createSeekdbClient() {
     host: env.SEEKDB_HOST,
     port: env.SEEKDB_PORT,
     user: env.SEEKDB_USER,
-    password: env.SEEKDB_PASSWORD,
+    password: env.SEEKDB_PASSWORD || "",
     database: env.SEEKDB_DATABASE,
   });
 }
