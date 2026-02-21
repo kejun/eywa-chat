@@ -49,9 +49,6 @@ export async function getMemoryCollection(): Promise<Collection> {
     const client = getSeekdbClient();
     globalCache.__memoryCollectionPromise = client.getOrCreateCollection({
       name: MEMORY_COLLECTION_NAME,
-      metadata: {
-        description: "Chatbot memory entries with vector embeddings",
-      },
     }).then(async (collection) => {
       logger.info("seekdb-collection-ready", {
         name: MEMORY_COLLECTION_NAME,
