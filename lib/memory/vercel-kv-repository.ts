@@ -254,6 +254,39 @@ export class VercelKVMemoryRepository {
       return 0;
     }
   }
+
+  async countAllMemories(): Promise<number> {
+    return this.count();
+  }
+
+  async deleteExpiredMemories(scope?: { tenantId?: string; userId?: string }): Promise<void> {
+    try {
+      const pattern = `${MEMORY_PREFIX}*`;
+      const keys = await kv.keys(pattern);
+      if (!keys || keys.length === 0) {
+        return;
+      }
+
+      const now = Date.now();
+      for (const key of keys) {
+        const entry = await kv.get<{ metadata?: { expiresAt?: number; tenantId?: string; userId?: string } }>(key);
+        if (!entry?.metadata?.expiresAt || entry.metadata.expiresAt > now) {
+          continue;
+        }
+        if (scope?.tenantId && entry.metadata.tenantId !== scope.tenantId) {
+          continue;
+        }
+        if (scope?.userId && entry.metadata.userId !== scope.userId) {
+          continue;
+        }
+        await kv.del(key);
+      }
+    } catch (error) {
+      logger.error('kv-delete-expired-memories-failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 }
 
 export const vercelKVMemoryRepository = new VercelKVMemoryRepository();

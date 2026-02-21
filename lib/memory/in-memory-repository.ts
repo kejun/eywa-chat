@@ -128,6 +128,25 @@ export class InMemoryMemoryRepository {
   async count(): Promise<number> {
     return memoryStore.size;
   }
+
+  async countAllMemories(): Promise<number> {
+    return this.count();
+  }
+
+  async deleteExpiredMemories(scope?: { tenantId?: string; userId?: string }): Promise<void> {
+    const now = Date.now();
+    for (const [id, entry] of memoryStore.entries()) {
+      if (entry.metadata.expiresAt && entry.metadata.expiresAt <= now) {
+        if (scope?.tenantId && entry.metadata.tenantId !== scope.tenantId) {
+          continue;
+        }
+        if (scope?.userId && entry.metadata.userId !== scope.userId) {
+          continue;
+        }
+        memoryStore.delete(id);
+      }
+    }
+  }
 }
 
 export const inMemoryMemoryRepository = new InMemoryMemoryRepository();
