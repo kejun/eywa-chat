@@ -1,4 +1,5 @@
 import { SeekdbClient, type Collection } from "seekdb";
+import "./embedding"; // Auto-registers embedding function
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
