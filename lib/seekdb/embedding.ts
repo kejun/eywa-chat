@@ -9,6 +9,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 class BailianEmbeddingFunction implements EmbeddingFunction {
+  public readonly name = "default-embed";
   private apiKey: string;
   private baseUrl: string;
   private model: string;
@@ -17,6 +18,13 @@ class BailianEmbeddingFunction implements EmbeddingFunction {
     this.apiKey = env.DASHSCOPE_API_KEY || "";
     this.baseUrl = env.DASHSCOPE_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
     this.model = "text-embedding-v4";
+  }
+
+  getConfig(): Record<string, unknown> {
+    return {
+      model: this.model,
+      baseUrl: this.baseUrl,
+    };
   }
 
   async generate(texts: string[]): Promise<number[][]> {
