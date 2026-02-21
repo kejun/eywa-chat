@@ -468,7 +468,8 @@ Skill/MCP 执行后不应全量落库，建议仅沉淀“高价值结果”：
 
 Vercel 发布、Cron、观测与回滚说明见：
 
-- `docs/DEPLOYMENT_RUNBOOK.md`
+- `docs/DEPLOYMENT_RUNBOOK.md` - Vercel 部署指南
+- `docs/SEEKDB_DOCKER_DEPLOYMENT.md` - SeekDB Docker 部署指南 ⭐
 - `docs/PERF_REPORT_TEMPLATE.md`
 - `docs/ISSUE_PROGRESS.md`
 - `docs/LOADTEST_EXECUTION_CHECKLIST.md`
