@@ -159,7 +159,7 @@ export class MemoryRepository {
         return entries;
       }
     } catch (error) {
-      logger.debug("memory-hybrid-search-failed", {
+      logger.warn("memory-hybrid-search-failed", {
         tenantId: input.tenantId,
         userId: input.userId,
         reason: error instanceof Error ? error.message : String(error),
@@ -181,7 +181,7 @@ export class MemoryRepository {
         return entries;
       }
     } catch (error) {
-      logger.debug("memory-text-search-failed", {
+      logger.warn("memory-text-search-failed", {
         tenantId: input.tenantId,
         userId: input.userId,
         reason: error instanceof Error ? error.message : String(error),
