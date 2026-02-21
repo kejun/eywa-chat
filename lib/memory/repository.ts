@@ -148,7 +148,7 @@ export class MemoryRepository {
           where,
           nResults: nResults * 2,
         },
-        rank: { rrf: { k: 60 } },
+        rank: { rrf: {} },
         nResults,
         include: ["documents", "metadatas", "distances"],
       });
