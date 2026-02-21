@@ -132,48 +132,88 @@ export class MemoryRepository {
     }
 
     const nResults = normalizeResults(input.nResults);
-    const wideResults = normalizeResults(nResults * RESULT_MULTIPLIER);
     const where = buildWhereFilter(input);
     const collection = await getMemoryCollection();
 
+    // Strategy 1: Try hybrid search first (best quality)
     try {
       const hybridResult = await collection.hybridSearch<MemoryMetadata>({
         query: {
           whereDocument: { $contains: queryText },
           where,
-          nResults: wideResults,
+          nResults: nResults * 2,
         },
         knn: {
           queryTexts: [queryText],
           where,
-          nResults: wideResults,
+          nResults: nResults * 2,
         },
-        rank: { rrf: {} },
+        rank: { rrf: { k: 60 } },
         nResults,
         include: ["documents", "metadatas", "distances"],
       });
 
-      const entries = mapQueryResultToEntries(hybridResult).slice(0, nResults);
-      await this.touchMemoryAccess(entries.map((entry) => entry.id));
-      return entries;
+      const entries = mapQueryResultToEntries(hybridResult);
+      if (entries.length > 0) {
+        await this.touchMemoryAccess(entries.map((entry) => entry.id));
+        return entries;
+      }
     } catch (error) {
-      logger.warn("memory-hybrid-search-failed", {
+      logger.debug("memory-hybrid-search-failed", {
         tenantId: input.tenantId,
         userId: input.userId,
         reason: error instanceof Error ? error.message : String(error),
       });
     }
 
-    const vectorResult = await collection.query<MemoryMetadata>({
-      queryTexts: [queryText],
-      where,
-      nResults,
-      include: ["documents", "metadatas", "distances"],
-    });
+    // Strategy 2: Fallback to pure text search (most reliable)
+    try {
+      const textResult = await collection.query<MemoryMetadata>({
+        queryTexts: [queryText],
+        where,
+        nResults,
+        include: ["documents", "metadatas"],
+      });
 
-    const fallbackEntries = mapQueryResultToEntries(vectorResult).slice(0, nResults);
-    await this.touchMemoryAccess(fallbackEntries.map((entry) => entry.id));
-    return fallbackEntries;
+      const entries = mapQueryResultToEntries(textResult);
+      if (entries.length > 0) {
+        await this.touchMemoryAccess(entries.map((entry) => entry.id));
+        return entries;
+      }
+    } catch (error) {
+      logger.debug("memory-text-search-failed", {
+        tenantId: input.tenantId,
+        userId: input.userId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Strategy 3: Last resort - list all memories for this user and filter client-side
+    try {
+      const allMemories = await collection.get<MemoryMetadata>({
+        where,
+        include: ["documents", "metadatas"],
+        limit: 50,
+      });
+
+      const entries = mapGetResultToEntries(allMemories);
+      const filtered = entries
+        .filter((entry) => entry.content.toLowerCase().includes(queryText.toLowerCase()))
+        .slice(0, nResults);
+
+      if (filtered.length > 0) {
+        await this.touchMemoryAccess(filtered.map((entry) => entry.id));
+        return filtered;
+      }
+    } catch (error) {
+      logger.warn("memory-fallback-search-failed", {
+        tenantId: input.tenantId,
+        userId: input.userId,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return [];
   }
 
   async upsertMemories(inputs: UpsertMemoryInput[]): Promise<
