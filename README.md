@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Logo](./public/logo.jpg)
+<img src="./public/logo.jpg" alt="Logo" width="240" />
 
 **具有持久化记忆的智能对话助手**
 
