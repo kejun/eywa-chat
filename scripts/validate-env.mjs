@@ -22,7 +22,13 @@ if (process.env.SKIP_ENV_VALIDATION === "1") {
   process.exit(0);
 }
 
-const missingKeys = requiredKeys.filter((key) => !process.env[key]);
+// SEEKDB_PASSWORD can be empty for local/dev setups without authentication
+const missingKeys = requiredKeys.filter((key) => {
+  if (key === "SEEKDB_PASSWORD") {
+    return process.env.SEEKDB_PASSWORD === undefined;
+  }
+  return !process.env[key];
+});
 
 const allowInsecureContext = process.env.ALLOW_INSECURE_CONTEXT === "1";
 if (!allowInsecureContext && !process.env.AUTH_JWT_SECRET) {
