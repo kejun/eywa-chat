@@ -124,7 +124,7 @@ function parseReminderMessage(message: string): { delayMs: number; reminderText:
       ? 1000
       : unit.startsWith("分")
         ? 60_000
-        : 60 * 60_000;
+        : 3_600_000;
   return {
     delayMs: amount * unitMs,
     reminderText,
