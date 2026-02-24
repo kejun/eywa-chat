@@ -31,6 +31,38 @@ function wait(ms: number) {
   });
 }
 
+function parseReminderMessage(message: string): { delayMs: number; reminderText: string } | null {
+  const normalized = message.trim();
+  const matched = normalized.match(
+    /^(\d+)\s*(秒钟?|分钟|小时)\s*后(?:提醒我|叫我)(.+)$/u,
+  );
+  if (!matched) {
+    return null;
+  }
+
+  const amount = Number(matched[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  const unit = matched[2];
+  const reminderText = matched[3].trim();
+  if (!reminderText) {
+    return null;
+  }
+
+  const unitMs =
+    unit.startsWith("秒")
+      ? 1000
+      : unit.startsWith("分")
+        ? 60_000
+        : 3_600_000;
+  return {
+    delayMs: amount * unitMs,
+    reminderText,
+  };
+}
+
 function createSseEncoder() {
   const encoder = new TextEncoder();
   return (event: string, payload: Record<string, unknown>) =>
@@ -148,6 +180,7 @@ export async function POST(request: Request) {
       const pushEvent = (event: string, body: Record<string, unknown>) => {
         controller.enqueue(sendSse(event, body));
       };
+      const reminder = parseReminderMessage(parsed.data.message);
 
       pushEvent("meta", { traceId });
 
@@ -163,6 +196,14 @@ export async function POST(request: Request) {
         for (const chunk of splitForStreaming(finalState.response)) {
           pushEvent("token", { text: chunk });
           await wait(15);
+        }
+
+        if (reminder) {
+          await wait(reminder.delayMs);
+          for (const chunk of splitForStreaming(`\n\n⏰ 提醒：${reminder.reminderText}`)) {
+            pushEvent("token", { text: chunk });
+            await wait(15);
+          }
         }
 
         pushEvent("done", {
@@ -205,6 +246,13 @@ export async function POST(request: Request) {
         for (const chunk of splitForStreaming(fallbackText)) {
           pushEvent("token", { text: chunk });
           await wait(15);
+        }
+        if (reminder) {
+          await wait(reminder.delayMs);
+          for (const chunk of splitForStreaming(`\n\n⏰ 提醒：${reminder.reminderText}`)) {
+            pushEvent("token", { text: chunk });
+            await wait(15);
+          }
         }
         pushEvent("done", { traceId, degraded: true });
 
