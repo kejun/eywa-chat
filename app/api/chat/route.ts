@@ -2,10 +2,13 @@ import { z } from "zod";
 import { resolveRequestIdentity } from "@/lib/auth/context";
 import { runChatGraph } from "@/lib/chat";
 import { logger } from "@/lib/logger";
+import { memoryRepositoryInstance as memoryRepository } from "@/lib/memory";
 import { recordMetric } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const REMINDER_KEY_TEXT_SLICE = 24;
+const REMINDER_KEY_TRACE_SLICE = 8;
 
 const ChatRequestSchema = z.object({
   threadId: z.string().min(1),
@@ -61,6 +64,13 @@ function parseReminderMessage(message: string): { delayMs: number; reminderText:
     delayMs: amount * unitMs,
     reminderText,
   };
+}
+
+function buildReminderMemoryKey(threadId: string, reminderText: string, traceId: string) {
+  const base =
+    reminderText.trim().toLowerCase().replace(/\s+/g, "_").slice(0, REMINDER_KEY_TEXT_SLICE) ||
+    "reminder";
+  return `reminder_${threadId}_${traceId.slice(0, REMINDER_KEY_TRACE_SLICE)}_${base}`;
 }
 
 function createSseEncoder() {
@@ -199,8 +209,24 @@ export async function POST(request: Request) {
         }
 
         if (reminder) {
-          await wait(reminder.delayMs);
-          for (const chunk of splitForStreaming(`\n\n⏰ 提醒：${reminder.reminderText}`)) {
+          const triggerAt = Date.now() + reminder.delayMs;
+          await memoryRepository.upsertMemories([
+            {
+              tenantId: identity.tenantId,
+              userId: identity.userId,
+              threadId: parsed.data.threadId,
+              memoryType: "task",
+              key: buildReminderMemoryKey(parsed.data.threadId, reminder.reminderText, traceId),
+              content: reminder.reminderText,
+              importance: 4,
+              sourceMessageId: traceId,
+              tags: ["reminder", "reminder_pending"],
+              expiresAt: triggerAt,
+              sourceType: "chat",
+              sourceName: "chat_reminder",
+            },
+          ]);
+          for (const chunk of splitForStreaming("\n\n已为你设置提醒，我会在到点后通知你。")) {
             pushEvent("token", { text: chunk });
             await wait(15);
           }
@@ -248,8 +274,24 @@ export async function POST(request: Request) {
           await wait(15);
         }
         if (reminder) {
-          await wait(reminder.delayMs);
-          for (const chunk of splitForStreaming(`\n\n⏰ 提醒：${reminder.reminderText}`)) {
+          const triggerAt = Date.now() + reminder.delayMs;
+          await memoryRepository.upsertMemories([
+            {
+              tenantId: identity.tenantId,
+              userId: identity.userId,
+              threadId: parsed.data.threadId,
+              memoryType: "task",
+              key: buildReminderMemoryKey(parsed.data.threadId, reminder.reminderText, traceId),
+              content: reminder.reminderText,
+              importance: 4,
+              sourceMessageId: traceId,
+              tags: ["reminder", "reminder_pending"],
+              expiresAt: triggerAt,
+              sourceType: "chat",
+              sourceName: "chat_reminder",
+            },
+          ]);
+          for (const chunk of splitForStreaming("\n\n已为你设置提醒，我会在到点后通知你。")) {
             pushEvent("token", { text: chunk });
             await wait(15);
           }
