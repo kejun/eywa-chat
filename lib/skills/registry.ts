@@ -18,7 +18,11 @@ function buildPreferenceSkill() {
         return null;
       }
 
-      const normalized = message.replace(/^.*?(记住|偏好是|喜欢)/, "").trim();
+      const normalized = message
+        .replace(/^.*?(记住|偏好是|不喜欢|喜欢)/, (_matched, keyword: string) =>
+          keyword === "不喜欢" ? "不喜欢" : "",
+        )
+        .trim();
       return {
         score: 0.8,
         args: {
