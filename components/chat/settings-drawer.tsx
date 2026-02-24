@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { X, ShieldCheck, Brain, Info, RotateCcw, TerminalSquare } from "lucide-react";
+import { X, ShieldCheck, Brain, Info, RotateCcw, TerminalSquare, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Terminal } from "@/components/tool-ui/terminal";
 import { cn } from "@/lib/utils";
@@ -202,6 +202,7 @@ export function SettingsDrawer({
                     disabled={clearConversationDisabled}
                     className="h-7 gap-1.5 text-xs"
                   >
+                    <Trash2 className="size-3" />
                     清空对话
                   </Button>
                   <Button

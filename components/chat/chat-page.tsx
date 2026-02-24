@@ -410,32 +410,33 @@ export function ChatPage() {
     };
   }, [threadId, settings.jwtToken, settings.tenantId, settings.userId]);
 
-  const refreshThread = useCallback(() => {
-    const nextId = createThreadId();
-    abortRef.current?.abort();
-    setThreadId(nextId);
+  const resetConversationViewState = useCallback(() => {
     setMessages([]);
-    setErrorText(null);
-    setCurrentStreamingId(null);
-    setActiveTerminal(null);
-    setTerminalHistory([]);
-    window.localStorage.setItem(THREAD_STORAGE_KEY, nextId);
-  }, []);
-
-  const clearConversation = useCallback(() => {
-    if (!threadId) {
-      return;
-    }
-    setMessages([]);
-    setInput("");
     setErrorText(null);
     setCurrentStreamingId(null);
     setActiveTerminal(null);
     setTerminalHistory([]);
     seenReminderIdsRef.current.clear();
     persistedSnapshotRef.current = "";
+  }, []);
+
+  const refreshThread = useCallback(() => {
+    const nextId = createThreadId();
+    abortRef.current?.abort();
+    setThreadId(nextId);
+    resetConversationViewState();
+    window.localStorage.setItem(THREAD_STORAGE_KEY, nextId);
+  }, [resetConversationViewState]);
+
+  const clearConversation = useCallback(() => {
+    if (!threadId) {
+      return;
+    }
+    abortRef.current?.abort();
+    resetConversationViewState();
+    setInput("");
     window.localStorage.removeItem(buildMessageStorageKey(threadId));
-  }, [threadId]);
+  }, [resetConversationViewState, threadId]);
 
   const handleClearTerminalHistory = useCallback(() => {
     setActiveTerminal(null);
