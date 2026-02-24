@@ -272,6 +272,7 @@ export function ChatPage() {
 
   const abortRef = useRef<AbortController | null>(null);
   const hydratedThreadRef = useRef<string | null>(null);
+  const persistedSnapshotRef = useRef<string>("");
   const messagePanelRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -301,7 +302,24 @@ export function ChatPage() {
     if (!threadId || hydratedThreadRef.current !== threadId) {
       return;
     }
-    window.localStorage.setItem(buildMessageStorageKey(threadId), JSON.stringify(messages));
+    persistedSnapshotRef.current = "";
+    const storageKey = buildMessageStorageKey(threadId);
+    const persistNow = () => {
+      const payload = JSON.stringify(messages);
+      const snapshot = `${storageKey}:${payload}`;
+      if (persistedSnapshotRef.current === snapshot) {
+        return;
+      }
+      window.localStorage.setItem(storageKey, payload);
+      persistedSnapshotRef.current = snapshot;
+    };
+    const timer = window.setTimeout(() => {
+      persistNow();
+    }, 150);
+    return () => {
+      window.clearTimeout(timer);
+      persistNow();
+    };
   }, [messages, threadId]);
 
   const refreshThread = useCallback(() => {
