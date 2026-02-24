@@ -5,5 +5,15 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "outputDirectory": ".next",
-  "regions": ["sin1"]
+  "regions": ["sin1"],
+  "crons": [
+    {
+      "path": "/api/cron/schedule/memory-ttl",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/schedule/memory-compact",
+      "schedule": "0 1 * * *"
+    }
+  ]
 }
