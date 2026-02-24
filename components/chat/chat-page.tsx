@@ -48,6 +48,34 @@ type ChatMessage = {
 };
 
 const THREAD_STORAGE_KEY = "eywa.chat.threadId";
+const MESSAGE_STORAGE_KEY_PREFIX = "eywa.chat.messages";
+
+function buildMessageStorageKey(threadId: string) {
+  return `${MESSAGE_STORAGE_KEY_PREFIX}.${threadId}`;
+}
+
+function parseStoredMessages(raw: string | null): ChatMessage[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((item) =>
+      Boolean(
+        item &&
+          typeof item === "object" &&
+          "id" in item &&
+          "role" in item &&
+          "content" in item,
+      ),
+    ) as ChatMessage[];
+  } catch {
+    return [];
+  }
+}
 
 const SUGGESTIONS = [
   {
@@ -243,6 +271,7 @@ export function ChatPage() {
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hydratedThreadRef = useRef<string | null>(null);
   const messagePanelRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -258,6 +287,22 @@ export function ChatPage() {
     if (!panel) return;
     panel.scrollTop = panel.scrollHeight;
   }, [isSending, messages]);
+
+  useEffect(() => {
+    if (!threadId) {
+      return;
+    }
+    const stored = window.localStorage.getItem(buildMessageStorageKey(threadId));
+    setMessages(parseStoredMessages(stored));
+    hydratedThreadRef.current = threadId;
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!threadId || hydratedThreadRef.current !== threadId) {
+      return;
+    }
+    window.localStorage.setItem(buildMessageStorageKey(threadId), JSON.stringify(messages));
+  }, [messages, threadId]);
 
   const refreshThread = useCallback(() => {
     const nextId = createThreadId();
