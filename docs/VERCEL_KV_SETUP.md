@@ -92,8 +92,8 @@ Vercel 会自动添加以下环境变量：
 
 使用 Cron Job 定期清理过期记忆：
 ```bash
-# 已有的 cron job 会自动清理
-/api/cron/memory-ttl
+# 通用 schedule 入口会执行 TTL 清理任务
+/api/cron/schedule/memory-ttl
 ```
 
 ### 4. 监控使用量

@@ -48,6 +48,35 @@ type ChatMessage = {
 };
 
 const THREAD_STORAGE_KEY = "eywa.chat.threadId";
+const MESSAGE_STORAGE_KEY_PREFIX = "eywa.chat.messages";
+const REMINDER_POLL_INTERVAL_MS = 2000;
+
+function buildMessageStorageKey(threadId: string) {
+  return `${MESSAGE_STORAGE_KEY_PREFIX}.${threadId}`;
+}
+
+function parseStoredMessages(raw: string | null): ChatMessage[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((item) =>
+      Boolean(
+        item &&
+          typeof item === "object" &&
+          "id" in item &&
+          "role" in item &&
+          "content" in item,
+      ),
+    ) as ChatMessage[];
+  } catch {
+    return [];
+  }
+}
 
 const SUGGESTIONS = [
   {
@@ -243,6 +272,9 @@ export function ChatPage() {
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
+  const hydratedThreadRef = useRef<string | null>(null);
+  const persistedSnapshotRef = useRef<string>("");
+  const seenReminderIdsRef = useRef<Set<string>>(new Set());
   const messagePanelRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -258,6 +290,125 @@ export function ChatPage() {
     if (!panel) return;
     panel.scrollTop = panel.scrollHeight;
   }, [isSending, messages]);
+
+  useEffect(() => {
+    if (!threadId) {
+      return;
+    }
+    const stored = window.localStorage.getItem(buildMessageStorageKey(threadId));
+    const hydratedMessages = parseStoredMessages(stored);
+    setMessages(hydratedMessages);
+    seenReminderIdsRef.current = new Set(
+      hydratedMessages
+        .map((message) =>
+          typeof message.traceId === "string" && message.traceId.startsWith("reminder:")
+            ? message.traceId.slice("reminder:".length)
+            : null,
+        )
+        .filter((value): value is string => Boolean(value)),
+    );
+    hydratedThreadRef.current = threadId;
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!threadId || hydratedThreadRef.current !== threadId) {
+      return;
+    }
+    persistedSnapshotRef.current = "";
+    const storageKey = buildMessageStorageKey(threadId);
+    const persistNow = () => {
+      const payload = JSON.stringify(messages);
+      const snapshot = `${storageKey}:${payload}`;
+      if (persistedSnapshotRef.current === snapshot) {
+        return;
+      }
+      window.localStorage.setItem(storageKey, payload);
+      persistedSnapshotRef.current = snapshot;
+    };
+    const timer = window.setTimeout(() => {
+      persistNow();
+    }, 150);
+    return () => {
+      window.clearTimeout(timer);
+      persistNow();
+    };
+  }, [messages, threadId]);
+
+  useEffect(() => {
+    if (!threadId) {
+      return;
+    }
+
+    const token = settings.jwtToken.trim();
+    const resolvedTenantId = settings.tenantId.trim();
+    const resolvedUserId = settings.userId.trim();
+    if (!token && (!resolvedTenantId || !resolvedUserId)) {
+      return;
+    }
+
+    let cancelled = false;
+    let polling = false;
+    const pollDueReminders = async () => {
+      if (cancelled || polling) {
+        return;
+      }
+      polling = true;
+      try {
+        const headers = new Headers();
+        if (token) {
+          headers.set("authorization", `Bearer ${token}`);
+        } else {
+          headers.set("x-tenant-id", resolvedTenantId);
+          headers.set("x-user-id", resolvedUserId);
+        }
+        const response = await fetch(`/api/reminders/due?threadId=${encodeURIComponent(threadId)}`, {
+          headers,
+        });
+        if (!response.ok) {
+          console.warn("reminder-poll-failed", response.status);
+          return;
+        }
+        const payload = (await response.json()) as {
+          reminders?: Array<{ id?: string; text?: string }>;
+        };
+        const reminders = Array.isArray(payload.reminders) ? payload.reminders : [];
+        if (reminders.length === 0) {
+          return;
+        }
+
+        setMessages((prev) => {
+          const next = [...prev];
+          for (const reminder of reminders) {
+            if (!reminder.id || !reminder.text) {
+              continue;
+            }
+            if (seenReminderIdsRef.current.has(reminder.id)) {
+              continue;
+            }
+            seenReminderIdsRef.current.add(reminder.id);
+            next.push({
+              id: createMessageId("assistant"),
+              role: "assistant",
+              content: `⏰ 提醒：${reminder.text}`,
+              traceId: `reminder:${reminder.id}`,
+            });
+          }
+          return next;
+        });
+      } finally {
+        polling = false;
+      }
+    };
+
+    void pollDueReminders();
+    const interval = window.setInterval(() => {
+      void pollDueReminders();
+    }, REMINDER_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [threadId, settings.jwtToken, settings.tenantId, settings.userId]);
 
   const refreshThread = useCallback(() => {
     const nextId = createThreadId();

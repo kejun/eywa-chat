@@ -11,7 +11,9 @@ function isProtectedApiPath(pathname: string): boolean {
     pathname === "/api/chat" ||
     pathname.startsWith("/api/chat/") ||
     pathname === "/api/memories" ||
-    pathname.startsWith("/api/memories/")
+    pathname.startsWith("/api/memories/") ||
+    pathname === "/api/reminders" ||
+    pathname.startsWith("/api/reminders/")
   );
 }
 

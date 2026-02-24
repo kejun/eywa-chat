@@ -55,12 +55,12 @@ npm run auth:jwt:generate -- \
 
 ## 3. Vercel Cron 配置建议
 
-建议创建两条 Cron：
+建议创建两条 Cron（统一走通用 schedule 入口）：
 
 1. 每日执行过期清理
-   - URL: `/api/cron/memory-ttl`
+   - URL: `/api/cron/schedule/memory-ttl`
 2. 每日执行摘要压缩（当前为占位）
-   - URL: `/api/cron/memory-compact`
+   - URL: `/api/cron/schedule/memory-compact`
 
 请求头建议附带：
 
