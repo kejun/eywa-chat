@@ -190,11 +190,11 @@ export function SettingsDrawer({
               会话线程
             </SectionTitle>
             <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+              <div className="flex flex-col gap-2 rounded-lg bg-muted/50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                 <code className="text-xs text-muted-foreground font-mono truncate max-w-[240px]">
                   {threadId || "初始化中..."}
                 </code>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="ghost"
                     size="sm"
