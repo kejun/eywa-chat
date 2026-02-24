@@ -20,6 +20,8 @@ type SettingsDrawerProps = {
   onSettingsChange: (settings: SettingsValues) => void;
   threadId: string;
   onNewThread: () => void;
+  onClearConversation: () => void;
+  clearConversationDisabled: boolean;
   activeTerminal: TerminalSession | null;
   terminalHistory: TerminalSession[];
   onClearTerminalHistory: () => void;
@@ -47,6 +49,8 @@ export function SettingsDrawer({
   onSettingsChange,
   threadId,
   onNewThread,
+  onClearConversation,
+  clearConversationDisabled,
   activeTerminal,
   terminalHistory,
   onClearTerminalHistory,
@@ -190,15 +194,26 @@ export function SettingsDrawer({
                 <code className="text-xs text-muted-foreground font-mono truncate max-w-[240px]">
                   {threadId || "初始化中..."}
                 </code>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onNewThread}
-                  className="h-7 gap-1.5 text-xs"
-                >
-                  <RotateCcw className="size-3" />
-                  新线程
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClearConversation}
+                    disabled={clearConversationDisabled}
+                    className="h-7 gap-1.5 text-xs"
+                  >
+                    清空对话
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onNewThread}
+                    className="h-7 gap-1.5 text-xs"
+                  >
+                    <RotateCcw className="size-3" />
+                    新线程
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 每个线程是一个独立的对话上下文。开始新线程会清空当前对话，

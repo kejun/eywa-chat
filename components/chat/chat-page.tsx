@@ -422,6 +422,21 @@ export function ChatPage() {
     window.localStorage.setItem(THREAD_STORAGE_KEY, nextId);
   }, []);
 
+  const clearConversation = useCallback(() => {
+    if (!threadId) {
+      return;
+    }
+    setMessages([]);
+    setInput("");
+    setErrorText(null);
+    setCurrentStreamingId(null);
+    setActiveTerminal(null);
+    setTerminalHistory([]);
+    seenReminderIdsRef.current.clear();
+    persistedSnapshotRef.current = "";
+    window.localStorage.removeItem(buildMessageStorageKey(threadId));
+  }, [threadId]);
+
   const handleClearTerminalHistory = useCallback(() => {
     setActiveTerminal(null);
     setTerminalHistory([]);
@@ -902,6 +917,8 @@ export function ChatPage() {
         onSettingsChange={setSettings}
         threadId={threadId}
         onNewThread={refreshThread}
+        onClearConversation={clearConversation}
+        clearConversationDisabled={isSending || messages.length === 0}
         activeTerminal={activeTerminal}
         terminalHistory={terminalHistory}
         onClearTerminalHistory={handleClearTerminalHistory}
