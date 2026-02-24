@@ -99,6 +99,38 @@ function toSingleLine(text: string, maxLength: number) {
   return `${compact.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
 }
 
+function parseReminderMessage(message: string): { delayMs: number; reminderText: string } | null {
+  const normalized = message.trim();
+  const matched = normalized.match(
+    /^(\d+)\s*(秒钟?|分钟|小时)\s*后(?:提醒我|叫我)(.+)$/u,
+  );
+  if (!matched) {
+    return null;
+  }
+
+  const amount = Number(matched[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  const unit = matched[2];
+  const reminderText = matched[3].trim();
+  if (!reminderText) {
+    return null;
+  }
+
+  const unitMs =
+    unit.startsWith("秒")
+      ? 1000
+      : unit.startsWith("分")
+        ? 60_000
+        : 60 * 60_000;
+  return {
+    delayMs: amount * unitMs,
+    reminderText,
+  };
+}
+
 type StreamPayload = Record<string, unknown>;
 
 function parseSsePacket(packet: string): { event: string; payload: StreamPayload } | null {
@@ -243,6 +275,7 @@ export function ChatPage() {
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
+  const reminderTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const messagePanelRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -260,6 +293,10 @@ export function ChatPage() {
   }, [isSending, messages]);
 
   const refreshThread = useCallback(() => {
+    for (const timeoutId of reminderTimeoutsRef.current) {
+      clearTimeout(timeoutId);
+    }
+    reminderTimeoutsRef.current = [];
     const nextId = createThreadId();
     abortRef.current?.abort();
     setThreadId(nextId);
@@ -345,6 +382,22 @@ export function ChatPage() {
         { id: userMessageId, role: "user", content: messageText },
         { id: assistantMessageId, role: "assistant", content: "" },
       ]);
+
+      const reminder = parseReminderMessage(messageText);
+      if (reminder) {
+        const timeoutId = setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: createMessageId("assistant"),
+              role: "assistant",
+              content: `⏰ 提醒：${reminder.reminderText}`,
+            },
+          ]);
+          reminderTimeoutsRef.current = reminderTimeoutsRef.current.filter((id) => id !== timeoutId);
+        }, reminder.delayMs);
+        reminderTimeoutsRef.current.push(timeoutId);
+      }
 
       setInput("");
       setErrorText(null);
@@ -518,6 +571,15 @@ export function ChatPage() {
     },
     [isSending, settings, threadId, updateAssistantMessage],
   );
+
+  useEffect(() => {
+    return () => {
+      for (const timeoutId of reminderTimeoutsRef.current) {
+        clearTimeout(timeoutId);
+      }
+      reminderTimeoutsRef.current = [];
+    };
+  }, []);
 
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
