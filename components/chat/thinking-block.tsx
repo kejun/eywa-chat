@@ -205,7 +205,7 @@ export function ThinkingBlock({ isActive, data }: ThinkingBlockProps) {
                 <span
                   className={cn(
                     step.status === "warning"
-                      ? "text-amber-700 dark:text-amber-400"
+                      ? "text-amber-700"
                       : "text-foreground/80",
                   )}
                 >
