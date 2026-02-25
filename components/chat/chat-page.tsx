@@ -14,6 +14,7 @@ import {
   SendHorizontal,
   Settings,
   Square,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -270,6 +271,7 @@ export function ChatPage() {
   const [currentStreamingId, setCurrentStreamingId] = useState<string | null>(null);
   const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
+  const [showNewConversationPrompt, setShowNewConversationPrompt] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const hydratedThreadRef = useRef<string | null>(null);
@@ -298,6 +300,9 @@ export function ChatPage() {
     const stored = window.localStorage.getItem(buildMessageStorageKey(threadId));
     const hydratedMessages = parseStoredMessages(stored);
     setMessages(hydratedMessages);
+    if (hydratedMessages.length > 0) {
+      setShowNewConversationPrompt(true);
+    }
     seenReminderIdsRef.current = new Set(
       hydratedMessages
         .map((message) =>
@@ -764,14 +769,25 @@ export function ChatPage() {
           </div>
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setSettingsOpen(true)}
-          className="size-9 p-0"
-        >
-          <Settings className="size-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearConversation}
+            disabled={isSending || messages.length === 0}
+            className="size-9 p-0"
+          >
+            <Trash2 className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            className="size-9 p-0"
+          >
+            <Settings className="size-4" />
+          </Button>
+        </div>
       </header>
 
       <div ref={messagePanelRef} className="flex-1 overflow-y-auto">
@@ -868,7 +884,32 @@ export function ChatPage() {
       )}
 
       <div className="border-t bg-background">
-        <div className="mx-auto max-w-2xl px-4 py-3 sm:px-6">
+        <div className="relative mx-auto max-w-2xl px-4 py-3 sm:px-6">
+          {showNewConversationPrompt && (
+            <div className="absolute bottom-full left-4 right-4 z-10 mb-0 sm:left-6 sm:right-6">
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
+                <span>是否开始全新的对话？</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowNewConversationPrompt(false)}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      clearConversation();
+                      setShowNewConversationPrompt(false);
+                    }}
+                  >
+                    是的
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="flex items-end gap-2">
             <div className="relative flex-1">
               <textarea
