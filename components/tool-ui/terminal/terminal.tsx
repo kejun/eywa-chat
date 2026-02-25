@@ -80,7 +80,7 @@ function TerminalHeader({
             "font-mono text-sm tabular-nums",
             exitCode === 0
               ? "text-muted-foreground"
-              : "text-red-600 dark:text-red-400",
+              : "text-red-600",
           )}
         >
           {exitCode}
@@ -100,7 +100,7 @@ function TerminalHeader({
           }
         >
           {hasOutput && copiedId === COPY_ID ? (
-            <Check className="h-4 w-4 text-green-700 dark:text-green-400" />
+            <Check className="h-4 w-4 text-green-700" />
           ) : (
             <Copy className="text-muted-foreground h-4 w-4" />
           )}
@@ -134,7 +134,7 @@ function TerminalOutput({
             </div>
           )}
           {stderr && (
-            <div className="mt-2 whitespace-pre text-red-500 dark:text-red-400">
+            <div className="mt-2 whitespace-pre text-red-500">
               <Ansi>{stderr}</Ansi>
             </div>
           )}
