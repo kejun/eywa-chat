@@ -884,27 +884,29 @@ export function ChatPage() {
       )}
 
       <div className="border-t bg-background">
-        <div className="mx-auto max-w-2xl px-4 py-3 sm:px-6">
+        <div className="relative mx-auto max-w-2xl px-4 py-3 sm:px-6">
           {showNewConversationPrompt && (
-            <div className="mb-2 flex items-center justify-between rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
-              <span>是否开始全新的对话？</span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowNewConversationPrompt(false)}
-                >
-                  取消
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    clearConversation();
-                    setShowNewConversationPrompt(false);
-                  }}
-                >
-                  是的
-                </Button>
+            <div className="absolute bottom-full left-4 right-4 z-10 mb-0 sm:left-6 sm:right-6">
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-md">
+                <span>是否开始全新的对话？</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowNewConversationPrompt(false)}
+                  >
+                    取消
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      clearConversation();
+                      setShowNewConversationPrompt(false);
+                    }}
+                  >
+                    是的
+                  </Button>
+                </div>
               </div>
             </div>
           )}
