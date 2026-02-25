@@ -14,6 +14,7 @@ import {
   SendHorizontal,
   Settings,
   Square,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -764,14 +765,25 @@ export function ChatPage() {
           </div>
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setSettingsOpen(true)}
-          className="size-9 p-0"
-        >
-          <Settings className="size-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearConversation}
+            disabled={isSending || messages.length === 0}
+            className="size-9 p-0"
+          >
+            <Trash2 className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            className="size-9 p-0"
+          >
+            <Settings className="size-4" />
+          </Button>
+        </div>
       </header>
 
       <div ref={messagePanelRef} className="flex-1 overflow-y-auto">
