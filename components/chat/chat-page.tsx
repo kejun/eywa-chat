@@ -271,6 +271,7 @@ export function ChatPage() {
   const [currentStreamingId, setCurrentStreamingId] = useState<string | null>(null);
   const [activeTerminal, setActiveTerminal] = useState<TerminalSession | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<TerminalSession[]>([]);
+  const [showNewConversationPrompt, setShowNewConversationPrompt] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const hydratedThreadRef = useRef<string | null>(null);
@@ -299,6 +300,9 @@ export function ChatPage() {
     const stored = window.localStorage.getItem(buildMessageStorageKey(threadId));
     const hydratedMessages = parseStoredMessages(stored);
     setMessages(hydratedMessages);
+    if (hydratedMessages.length > 0) {
+      setShowNewConversationPrompt(true);
+    }
     seenReminderIdsRef.current = new Set(
       hydratedMessages
         .map((message) =>
@@ -881,6 +885,29 @@ export function ChatPage() {
 
       <div className="border-t bg-background">
         <div className="mx-auto max-w-2xl px-4 py-3 sm:px-6">
+          {showNewConversationPrompt && (
+            <div className="mb-2 flex items-center justify-between rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
+              <span>是否开始全新的对话？</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNewConversationPrompt(false)}
+                >
+                  取消
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    clearConversation();
+                    setShowNewConversationPrompt(false);
+                  }}
+                >
+                  是的
+                </Button>
+              </div>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="flex items-end gap-2">
             <div className="relative flex-1">
               <textarea
