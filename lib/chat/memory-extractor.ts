@@ -1,4 +1,5 @@
 import type { UpsertMemoryInput } from "@/lib/memory";
+import { extractRememberCommandContent, hasMemoryWriteIntent } from "@/lib/chat/memory-intent";
 
 function detectMemoryType(message: string): UpsertMemoryInput["memoryType"] {
   if (/我喜欢|我偏好|偏向|习惯/.test(message)) {
@@ -17,15 +18,11 @@ function detectMemoryType(message: string): UpsertMemoryInput["memoryType"] {
 }
 
 function shouldPersist(message: string): boolean {
-  return /记住|我喜欢|我偏好|我叫|我是|我的|任务|提醒|下次/.test(message);
+  return hasMemoryWriteIntent(message);
 }
 
 function deriveMemoryContent(message: string): string {
-  const rememberIndex = message.indexOf("记住");
-  if (rememberIndex >= 0) {
-    return message.slice(rememberIndex).trim();
-  }
-  return message.trim();
+  return extractRememberCommandContent(message);
 }
 
 function deriveMemoryKey(message: string): string {
