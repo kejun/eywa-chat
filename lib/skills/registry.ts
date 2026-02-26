@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { extractRememberCommandContent, hasMemoryWriteIntent, isMemoryRecapQuery } from "@/lib/chat/memory-intent";
 import type { SkillContext, SkillDefinition, SkillResult } from "@/lib/skills/types";
 
 type AnySkillDefinition = SkillDefinition<z.ZodTypeAny>;
@@ -13,16 +14,12 @@ function buildPreferenceSkill() {
     description: "抽取并固化用户偏好",
     inputSchema,
     match: (message: string) => {
-      const matched = /记住|偏好|喜欢|习惯/.test(message);
-      if (!matched) {
+      const likelyPreferenceWrite = /记住|偏好|喜欢|习惯|不喜欢/.test(message);
+      if (!likelyPreferenceWrite || !hasMemoryWriteIntent(message) || isMemoryRecapQuery(message)) {
         return null;
       }
 
-      const normalized = message
-        .replace(/^.*?(记住|偏好是|不喜欢|喜欢)/, (_matched, keyword: string) =>
-          keyword === "不喜欢" ? "不喜欢" : "",
-        )
-        .trim();
+      const normalized = extractRememberCommandContent(message);
       return {
         score: 0.8,
         args: {
