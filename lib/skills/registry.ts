@@ -3,6 +3,7 @@ import { extractRememberCommandContent, hasMemoryWriteIntent, isMemoryRecapQuery
 import type { SkillContext, SkillDefinition, SkillResult } from "@/lib/skills/types";
 
 type AnySkillDefinition = SkillDefinition<z.ZodTypeAny>;
+const PREFERENCE_WRITE_PATTERN = /记住|偏好|喜欢|习惯|不喜欢/;
 
 function buildPreferenceSkill() {
   const inputSchema = z.object({
@@ -14,7 +15,7 @@ function buildPreferenceSkill() {
     description: "抽取并固化用户偏好",
     inputSchema,
     match: (message: string) => {
-      const likelyPreferenceWrite = /记住|偏好|喜欢|习惯|不喜欢/.test(message);
+      const likelyPreferenceWrite = PREFERENCE_WRITE_PATTERN.test(message);
       if (!likelyPreferenceWrite || !hasMemoryWriteIntent(message) || isMemoryRecapQuery(message)) {
         return null;
       }
